@@ -1,13 +1,19 @@
 import type { Reel } from '../lib/types'
 
-// API 연결(#12) 전까지 플레이어를 단독으로 확인하기 위한 고정 데이터.
+// 플레이어를 단독으로 확인하기 위한 고정 편집 플랜 (http://localhost:5173/?demo=player).
 // 이미지는 public/sample/ 에 직접 만든 SVG (외부 출처 없음).
+const img = (n: number) => `/sample/${n}.svg`
+
 export const sampleReel: Reel = {
-  title: '축제 첫날 🎉',
-  scenes: [
-    { mediaUrl: '/sample/1.svg', type: 'image', durationMs: 2500, caption: '드디어 시작된 우리 학교 축제', transition: 'fade' },
-    { mediaUrl: '/sample/2.svg', type: 'image', durationMs: 2000, caption: '공강엔 잠깐 도서관 들렀다가', transition: 'slide' },
-    { mediaUrl: '/sample/3.svg', type: 'image', durationMs: 2000, caption: '학식으로 에너지 충전 완료', transition: 'zoom' },
-    { mediaUrl: '/sample/4.svg', type: 'image', durationMs: 3000, caption: '오늘 하루도 릴스로 남겨둘게', transition: 'fade' },
+  template: 'emotional',
+  clipDuration: 2.5,
+  bgmBpm: 120,
+  fixedText: null,
+  clips: [
+    { mediaUrl: img(1), type: 'image', caption: '드디어 시작된 축제', captionEn: 'The festival finally begins' },
+    { mediaUrl: img(2), type: 'image', caption: '공강엔 잠깐 도서관', captionEn: 'A quick stop at the library' },
+    { mediaUrl: img(3), type: 'image', caption: '학식으로 충전 완료', captionEn: 'Recharged at the cafeteria' },
+    { mediaUrl: img(4), type: 'image', caption: '오늘도 릴스로 남겨둘게', captionEn: "I'll keep today as a reel" },
   ],
+  flashMontage: { startIndex: 2, mediaUrls: [1, 2, 3, 4, 1, 2, 3, 4].map(img) },
 }

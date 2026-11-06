@@ -1,4 +1,4 @@
-import type { Reel } from './types'
+import type { LegacyReel, Reel } from './types'
 
 // 배포 시에는 VITE_API_BASE(예: https://xxx.onrender.com)를, 개발 중에는 vite proxy를 쓴다.
 export const API_BASE = import.meta.env.VITE_API_BASE ?? ''
@@ -121,14 +121,36 @@ export async function getEntry(id: string): Promise<EntryDetail> {
   const res = await fetch(`${API_BASE}/api/entries/${id}`)
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(body.error ?? 'unknown', res.status)
-  return body
+  return { ...body, reel: body.reel ? toPlan(body.reel) : null }
+}
+
+/**
+ * 임시(#31 병합 전까지): 서버가 아직 옛 장면 JSON(title·scenes)을 주면 v2 편집 플랜으로 바꾼다.
+ * 제목+컷마다 자막이 있는 review 템플릿이 옛 모양과 가장 가깝다. #31 병합 후 지운다.
+ */
+export function toPlan(reel: Reel | LegacyReel): Reel {
+  if ('clips' in reel) return reel
+  const scenes = reel.scenes ?? []
+  const avgMs = scenes.reduce((s, x) => s + (x.durationMs || 0), 0) / Math.max(1, scenes.length)
+  return {
+    template: 'review',
+    clipDuration: Math.round(avgMs / 100) / 10 || 1,
+    fixedText: reel.title ? { title: reel.title } : null,
+    clips: scenes.map((x) => ({ mediaUrl: x.mediaUrl, type: x.type, caption: x.caption || null })),
+    flashMontage: null,
+    videoUrl: reel.videoUrl ?? null,
+  }
 }
 
 /** 플레이어에 넘기기 전에 /media/.. 상대경로를 배포 환경에서도 서버로 가게 바꾼다 */
 export function withMediaUrls(reel: Reel): Reel {
   return {
     ...reel,
-    scenes: reel.scenes.map((s) => ({ ...s, mediaUrl: mediaUrl(s.mediaUrl) ?? s.mediaUrl })),
+    clips: reel.clips.map((c) => ({ ...c, mediaUrl: mediaUrl(c.mediaUrl) ?? c.mediaUrl })),
+    flashMontage: reel.flashMontage && {
+      ...reel.flashMontage,
+      mediaUrls: reel.flashMontage.mediaUrls.map((u) => mediaUrl(u) ?? u),
+    },
     videoUrl: mediaUrl(reel.videoUrl ?? null),
   }
 }

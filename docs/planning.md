@@ -96,6 +96,7 @@ POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← 
 ```
 ### API 계약 v2 (예정 — 아직 코드에 없음. #31 서버 · #32 합성기 PR에서 위 계약을 이걸로 교체)
 > 구현 전까지는 **위의 현재 계약**을 따른다. v2로 바꾸는 PR이 이 섹션을 위로 올리고 지운다.
+> 앱(#32)은 v2로 바뀜 — 서버가 아직 옛 `title`·`scenes`를 주면 `toPlan()`(`app/src/lib/api.ts`)이 `review` 플랜으로 변환. #31 병합 때 `toPlan()` 제거
 ```
 GET  /api/entries/{id}   (v2)
   → 200 { "id", "date", "diary", "tags": [..], "status": "processing" | "done" | "failed",
