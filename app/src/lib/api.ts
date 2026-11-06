@@ -29,3 +29,34 @@ export async function getEntries(month: string): Promise<EntrySummary[]> {
   const body: { entries: EntrySummary[] } = await res.json()
   return body.entries
 }
+
+// GET /api/styles
+export type Style = { id: string; label: string; emoji: string }
+
+export async function getStyles(): Promise<Style[]> {
+  const res = await fetch(`${API_BASE}/api/styles`)
+  if (!res.ok) throw new Error(`styles ${res.status}`)
+  const body: { styles: Style[] } = await res.json()
+  return body.styles
+}
+
+// POST /api/entries (multipart) — tags는 같은 키를 반복해서 보낸다 (FastAPI List[str] = Form())
+export type EntryDraft = { date: string; diary: string; tags: string[]; files: File[] }
+
+export function toEntryFormData({ date, diary, tags, files }: EntryDraft): FormData {
+  const fd = new FormData()
+  fd.append('date', date)
+  fd.append('diary', diary)
+  tags.forEach((t) => fd.append('tags', t))
+  files.forEach((f) => fd.append('files', f))
+  return fd
+}
+
+export async function createEntry(
+  draft: EntryDraft,
+): Promise<{ id: string; date: string; status: EntryStatus }> {
+  const res = await fetch(`${API_BASE}/api/entries`, { method: 'POST', body: toEntryFormData(draft) })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error ?? `entries ${res.status}`)
+  return body
+}

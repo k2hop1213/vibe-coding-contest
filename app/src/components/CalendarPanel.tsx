@@ -30,7 +30,7 @@ export default function CalendarPanel({
   const cells = buildMonthGrid(year, month0)
 
   return (
-    <section className="relative overflow-hidden bg-linear-to-b from-rose-500 to-fuchsia-700 px-5 pt-8 pb-6 text-white md:px-7">
+    <section className="relative overflow-hidden md:h-full bg-linear-to-b from-rose-500 to-fuchsia-700 px-5 pt-8 pb-6 text-white md:px-7">
       {/* 배경에 크게 깔리는 연도 (템플릿의 흐린 워터마크 느낌) */}
       <span
         aria-hidden
