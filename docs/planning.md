@@ -41,8 +41,8 @@
 | 영역 | 담당 | 주요 이슈 |
 |---|---|---|
 | PM & Infra | @k2hop1213 | |
-| Frontend | @TEAMMATE_B | |
-| Backend · AI | @TEAMMATE_C | |
+| Frontend | @sijin2170 | |
+| Backend · AI | @songkh1201 | |
 
 ## API 계약 (프론트 ↔ 백엔드, 단일 출처)
 ```
