@@ -5,7 +5,7 @@
 
 ## 프로젝트
 - 주제: **AI로 다시 쓰는 대학생활** (예: AI 캠퍼스 사주풀이, 교수님과 나의 궁합) — 문제 해결을 넘어 새로운 경험을 만드는 창의적인 웹
-- 아이디어: **하루릴스** — 사진·일기 + 스타일 태그 → AI 릴스(장면 JSON + 웹 플레이어) → 달력 다이어리. 상세·API 계약은 `docs/planning.md`
+- 아이디어: **하루릴스** — 사진·일기 + 스타일 태그(힌트) → AI 편집 플랜 → 브라우저 mp4 합성(720×1280) → 달력 다이어리. API 계약은 `docs/planning.md`, 릴스 렌더링 규칙은 `docs/REELS_TEMPLATES.md`
 - 스택: `app/` React 19 + TS + Vite + Tailwind v4 (테스트 Vitest, 린트 oxlint) · `server/` FastAPI (Python 3.13, 테스트 pytest, 린트 ruff) · Claude API
 - 폴더: `app/` = 프론트, `server/` = 백엔드·AI, `docs/` = 기획
 - 실행: `cd server && .venv/Scripts/python -m uvicorn app.main:app --reload` (8000) + `cd app && npm run dev` (5173, /api·/media는 8000으로 프록시)

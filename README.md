@@ -63,8 +63,6 @@ npm run dev                                                   # http://localhost
 
 화면 오른쪽 위에 "서버 연결됨"이 보이면 둘 다 정상입니다.
 
-달력이 비어 있으면 데모 데이터를 채우세요: `cd server && .venv/Scripts/python -m app.seed` (자세한 옵션은 [docs/DEPLOY.md](docs/DEPLOY.md)).
-
 ## 폴더 구조
 
 ```

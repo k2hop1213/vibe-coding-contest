@@ -103,7 +103,3 @@ def list_month(month: str) -> list[dict]:
         ).fetchall()
     return [_row(r) for r in rows]
 
-
-def count_entries() -> int:
-    with connect() as conn:
-        return conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
