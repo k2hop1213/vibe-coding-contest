@@ -45,7 +45,14 @@
 1. https://vercel.com 에 GitHub 계정으로 로그인 → **Add New → Project** → 이 저장소 선택.
 2. **Root Directory**를 `app`으로 지정합니다(Framework는 Vite로 자동 인식).
 3. 환경변수 `VITE_API_BASE` = 2단계의 서버 주소 (예: `https://haru-reels-api.onrender.com`, 끝에 `/` 없이).
-4. 배포 후 받은 주소를 Render의 `ALLOWED_ORIGINS`에 넣고 Render를 재배포합니다.
+4. 배포 후 받은 주소를 Render의 `ALLOWED_ORIGINS`에 넣고 Render를 재배포합니다. Blueprint 생성 때 비워 둔 변수는 만들어지지 않으므로 Render 서비스 → **Environment → Edit → Add variable**로 추가한 뒤 **Save, rebuild, and deploy**.
 5. 앱을 열어 오른쪽 위가 "서버 연결됨"이고 달력에 썸네일이 보이면 끝. 주소는 `README.md`의 배포 주소에 적어 주세요.
 
 `main`에 병합할 때마다 두 곳 모두 자동으로 다시 배포됩니다.
+
+## 현재 배포 (2026-11-06)
+
+| | 주소 | 대시보드 |
+|---|---|---|
+| 앱 | https://haru-reels.vercel.app | Vercel 프로젝트 `haru-reels` (k2hop1213) |
+| 서버 | https://haru-reels-api.onrender.com | Render Blueprint `haru-reels` → 서비스 `haru-reels-api` (k2hop1213) |
