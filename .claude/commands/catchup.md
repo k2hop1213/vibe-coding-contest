@@ -5,7 +5,7 @@ GitHub 아이디는 `@me`로 자동 인식되니 따로 확인할 필요 없다.
 
 1. **최신화 (문서는 바뀐 것만 읽기)**
    ```bash
-   git checkout -q main && B=$(git rev-parse HEAD) && git pull -q origin main && git diff --stat $B HEAD -- docs/planning.md CONTRIBUTING.md CLAUDE.md
+   git switch -q main && B=$(git rev-parse HEAD) && git pull -q origin main && git diff --stat $B HEAD -- docs/planning.md CONTRIBUTING.md CLAUDE.md
    ```
    출력에 파일이 있을 때만 그 파일을 읽어라. 이번 세션에서 `docs/planning.md`를 아직 안 읽었다면 그것만 읽어라.
 2. **할 일 조회 (출력 최소화)**

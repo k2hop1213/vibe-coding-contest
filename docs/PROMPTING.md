@@ -56,7 +56,6 @@ Claude Code는 **매 메시지마다 지금까지의 대화 전체 + CLAUDE.md +
 ## 5. 대회 타임라인
 **대회 전 (지금 할 수 있는 것)**
 - [ ] CODEOWNERS·CONTRIBUTING·README·planning의 `TEAMMATE_B/C`를 실제 GitHub 아이디로 교체
-- [ ] 라벨 생성 (`feature`, `bug`, `docs`)
 - [ ] 팀원 전원 `gh auth login` + Claude Code에서 `/catchup` 한 번 돌려 동작 확인
 - [ ] 쓸 스택 1~2개 정해두고, 빈 프로젝트가 뜨는지 미리 확인 (설치 시간 절약)
 

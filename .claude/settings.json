@@ -6,7 +6,6 @@
       "Bash(git log:*)",
       "Bash(git fetch:*)",
       "Bash(git pull:*)",
-      "Bash(git checkout:*)",
       "Bash(git switch:*)",
       "Bash(git branch:*)",
       "Bash(git rev-parse:*)",
