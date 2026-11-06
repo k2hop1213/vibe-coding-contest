@@ -88,6 +88,11 @@ GET  /api/entries/{id}
                           "durationMs": 2500, "caption": "...", "transition": "fade" | "slide" | "zoom" } ]
           } }
   | 404 { "error": "not_found" }
+  ※ reel에 "videoUrl": "/media/.." | null — 장면을 하나로 합친 영상 (#27). null이면 아직 안 합침
+
+POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← #27
+  → 200 { "videoUrl": "/media/<uuid>.mp4" }
+  | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
 ```
 - 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지)
 - 업로드 파일은 `GET /media/{파일명}`으로 서빙. `mediaUrl`·`thumbnailUrl`은 상대 경로 → 프론트는 `mediaUrl()`(`app/src/lib/api.ts`)로 `API_BASE`를 붙여 쓴다
@@ -103,4 +108,5 @@ GET  /api/entries/{id}
 - (11/06) 아이디어 확정: 사진+일기 → AI 릴스 + 달력 다이어리
 - (11/06) MVP 릴스는 영상 인코딩 대신 장면 JSON + 웹 플레이어 — 데모 안정성, 개발 시간 절약
 - (11/06) 작성 화면 레이아웃은 vStory 앱 화면을 참고 → CREDITS.md 기록
+- (11/06) 릴스를 하나의 MP4로 합침(#27) — 서버 ffmpeg는 무료 서버에서 수 분이라 **브라우저에서 합성**: 캔버스에 프레임마다 그려 WebCodecs로 H.264 인코딩(지원 안 되면 실시간 녹화) → 서버에 업로드
 - (11/06) Claude 호출은 학교 제공 BAZE API Gateway(Claude 호환 `/v1/gateway/claude`) 키로 — Anthropic 크레딧 없이 사용. 실측: 사진 2장 약 5초, 약 4.7k 토큰

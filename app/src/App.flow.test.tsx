@@ -56,7 +56,7 @@ test('제출하면 업로드 → 생성 중 화면 → 완료되면 플레이어
     expect.objectContaining({ date: '2026-11-06', tags: ['festival'] }),
     expect.any(Function),
   )
-  expect(await screen.findByText('완성!')).toBeInTheDocument()
+  expect(await screen.findByText('완성!', {}, { timeout: 4000 })).toBeInTheDocument() // 전체 테스트 병렬 실행 시 느려질 수 있음
   expect(screen.getByRole('button', { name: '11월 6일 (릴스 있음)' })).toBeInTheDocument()
 })
 

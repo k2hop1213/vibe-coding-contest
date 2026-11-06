@@ -75,6 +75,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   invalid_media: 'jpg·png·gif·webp·mp4·mov·webm 파일만 올릴 수 있어요.',
   file_too_large: '파일 하나가 50MB를 넘어요.',
   already_exists: '이 날짜엔 이미 릴스가 있어요.',
+  not_ready: '릴스가 아직 완성되지 않았어요.',
   invalid_request: '요청 형식이 올바르지 않아요.',
   network: '서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.',
 }
@@ -125,5 +126,20 @@ export async function getEntry(id: string): Promise<EntryDetail> {
 
 /** 플레이어에 넘기기 전에 /media/.. 상대경로를 배포 환경에서도 서버로 가게 바꾼다 */
 export function withMediaUrls(reel: Reel): Reel {
-  return { ...reel, scenes: reel.scenes.map((s) => ({ ...s, mediaUrl: mediaUrl(s.mediaUrl) ?? s.mediaUrl })) }
+  return {
+    ...reel,
+    scenes: reel.scenes.map((s) => ({ ...s, mediaUrl: mediaUrl(s.mediaUrl) ?? s.mediaUrl })),
+    videoUrl: mediaUrl(reel.videoUrl ?? null),
+  }
+}
+
+// POST /api/entries/{id}/video — 브라우저에서 합친 릴스 영상 업로드 (#27)
+export async function uploadVideo(id: string, video: Blob): Promise<{ videoUrl: string }> {
+  const fd = new FormData()
+  const ext = video.type.includes('mp4') ? 'mp4' : 'webm'
+  fd.append('file', video, `reel.${ext}`)
+  const res = await fetch(`${API_BASE}/api/entries/${id}/video`, { method: 'POST', body: fd })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(body.error ?? 'unknown', res.status)
+  return body
 }
