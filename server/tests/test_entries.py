@@ -9,7 +9,8 @@ from app.main import app
 
 client = TestClient(app)
 
-SCENE_KEYS = {"mediaUrl", "type", "durationMs", "caption", "transition"}
+CLIP_KEYS = {"mediaUrl", "type", "caption", "captionEn"}
+REEL_KEYS = {"template", "clipDuration", "bgmBpm", "fixedText", "clips", "flashMontage", "videoUrl"}
 JPG = ("files", ("a.jpg", b"\xff\xd8fakejpeg", "image/jpeg"))
 MP4 = ("files", ("b.MP4", b"fakemp4", "video/mp4"))
 
@@ -47,12 +48,15 @@ def test_create_saves_media_and_builds_reel_from_uploads():
     assert detail["tags"] == ["festival"]
     assert detail["diary"] == "축제 첫날! 공연까지 봤다."
 
-    scenes = detail["reel"]["scenes"]
-    assert [s["type"] for s in scenes] == ["image", "video"]
-    assert all(set(s) == SCENE_KEYS for s in scenes)
-    assert all(s["transition"] in {"fade", "slide", "zoom"} for s in scenes)
-    assert [s["caption"] for s in scenes] == ["축제 첫날!", "공연까지 봤다."]
-    assert scenes[1]["mediaUrl"].endswith(".mp4")
+    reel = detail["reel"]
+    assert set(reel) == REEL_KEYS
+    assert reel["template"] == "montage"  # 스텁: festival 힌트 → montage
+    clips = reel["clips"]
+    assert all(set(c) == CLIP_KEYS for c in clips)
+    assert [c["type"] for c in clips[:2]] == ["image", "video"]
+    assert clips[1]["mediaUrl"].endswith(".mp4")
+    assert len(clips) * reel["clipDuration"] >= 10, "총 길이 10초 이상"
+    scenes = clips
 
     # 올린 파일이 /media로 그대로 서빙된다
     served = client.get(scenes[0]["mediaUrl"])
@@ -213,7 +217,7 @@ def test_rejects_unsafe_or_unsupported_media(name, ctype):
 
 def test_media_served_with_nosniff_and_allowed_ext_kept():
     res = _post(files=[("files", ("photo.JPEG", b"\xff\xd8x", "image/jpeg")), MP4])
-    scenes = client.get(f"/api/entries/{res.json()['id']}").json()["reel"]["scenes"]
+    scenes = client.get(f"/api/entries/{res.json()['id']}").json()["reel"]["clips"]
     assert scenes[0]["mediaUrl"].endswith(".jpeg") and scenes[1]["mediaUrl"].endswith(".mp4")
     served = client.get(scenes[0]["mediaUrl"])
     assert served.headers["x-content-type-options"] == "nosniff"
