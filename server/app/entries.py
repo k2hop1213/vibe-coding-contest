@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app import db, reel_ai
 from app.config import media_dir, stub_delay_seconds
@@ -268,3 +268,16 @@ async def upload_video(
     video_url = f"/media/{path.name}"
     db.finish_entry(entry_id, "done", {**entry["reel"], "videoUrl": video_url})
     return {"videoUrl": video_url}
+
+
+# ── 기록 삭제 — 그날 기록(사진·일기·릴스 영상)을 지우고 다시 올릴 수 있게 ──────────
+@router.delete("/entries/{entry_id}", status_code=204, response_model=None)
+def delete_entry(entry_id: str) -> Response | JSONResponse:
+    entry = db.get_entry(entry_id)
+    if entry is None:
+        return _error(404, "not_found")
+    # 생성 중이어도 지운다. 백그라운드 작업이 끝나도 finish_entry는 없는 id라 아무것도 하지 않는다
+    db.delete_entry(entry_id)
+    _delete_media(entry["media"])
+    _delete_video(entry)
+    return Response(status_code=204)

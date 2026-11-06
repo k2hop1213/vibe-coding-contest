@@ -117,6 +117,14 @@ export type EntryDetail = {
   reel: Reel | null
 }
 
+/** DELETE /api/entries/{id} — 그날 기록 전체 삭제 (204) */
+export async function deleteEntry(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/entries/${id}`, { method: 'DELETE' })
+  if (res.status === 204 || res.status === 404) return // 이미 없으면 지워진 것으로 본다
+  const body = await res.json().catch(() => ({}))
+  throw new ApiError(body.error ?? 'unknown', res.status)
+}
+
 export async function getEntry(id: string): Promise<EntryDetail> {
   const res = await fetch(`${API_BASE}/api/entries/${id}`)
   const body = await res.json().catch(() => ({}))

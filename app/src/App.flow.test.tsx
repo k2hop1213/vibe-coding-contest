@@ -17,8 +17,13 @@ beforeEach(() => {
   detail = {}
   URL.createObjectURL = vi.fn(() => 'blob:1')
   URL.revokeObjectURL = vi.fn()
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = String(input)
+    if (init?.method === 'DELETE') {
+      const id = url.split('/').pop()!
+      entries = entries.filter((e) => (e as { id: string }).id !== id)
+      return new Response(null, { status: 204 })
+    }
     if (url.includes('/api/health')) return json({ ok: true })
     if (url.includes('/api/styles')) return json({ styles: [{ id: 'festival', label: '축제·MT', emoji: '🎉' }] })
     if (url.includes('?month=')) return json({ entries })
@@ -89,4 +94,29 @@ test('동영상 썸네일은 1초 지점 장면으로, 썸네일 없는 완료�
   const thumb = await screen.findByTestId('video-thumb')
   expect(thumb.getAttribute('src')).toBe('/media/v.mp4#t=1')
   expect(screen.getByRole('button', { name: '11월 3일 (릴스 있음)' })).toHaveTextContent('🎬')
+})
+
+test('기록 삭제 → 확인 → 그날 칸이 비고 다시 올릴 수 있다', async () => {
+  entries = [{ id: 'e1', date: '2026-11-06', status: 'failed', thumbnailUrl: null }]
+  detail.e1 = { id: 'e1', date: '2026-11-06', diary: '', tags: [], status: 'failed', reel: null }
+  render(<App />)
+
+  fireEvent.click(await screen.findByRole('button', { name: '기록 삭제' }))
+  // 바로 지우지 않고 한 번 더 확인
+  expect(screen.getByRole('group', { name: '기록 삭제 확인' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '삭제' }))
+
+  expect(await screen.findByRole('button', { name: '✨ 릴스 만들기' })).toBeInTheDocument()
+  expect(globalThis.fetch).toHaveBeenCalledWith('/api/entries/e1', { method: 'DELETE' })
+  expect(screen.getByRole('button', { name: '11월 6일' })).toBeInTheDocument() // 칸에서 "(생성 실패)" 사라짐
+})
+
+test('삭제 확인에서 취소하면 아무것도 지우지 않는다', async () => {
+  entries = [{ id: 'e1', date: '2026-11-06', status: 'failed', thumbnailUrl: null }]
+  detail.e1 = { id: 'e1', date: '2026-11-06', diary: '', tags: [], status: 'failed', reel: null }
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: '기록 삭제' }))
+  fireEvent.click(screen.getByRole('button', { name: '취소' }))
+  expect(await screen.findByRole('button', { name: '다시 만들기' })).toBeInTheDocument()
+  expect(vi.mocked(globalThis.fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
 })

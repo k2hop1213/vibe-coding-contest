@@ -88,6 +88,11 @@ def get_by_date(date: str) -> dict | None:
         return _row(conn.execute("SELECT * FROM entries WHERE date = ?", (date,)).fetchone())
 
 
+def delete_entry(entry_id: str) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+
+
 def fail_stale_processing() -> int:
     """서버 시작 시: 백그라운드 작업은 재시작하면 사라지므로 processing으로 남은 기록을 failed로.
     failed는 다시 올리면 덮어쓸 수 있어 그 날짜가 409로 막히지 않는다."""

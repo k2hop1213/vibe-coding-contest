@@ -97,6 +97,10 @@ GET  /api/entries/{id}   (v2 — #31 서버 · #32 합성기)
 POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← #27
   → 200 { "videoUrl": "/media/<uuid>.mp4" }
   | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
+
+DELETE /api/entries/{id}                          ← 그날 기록 삭제 (사진·동영상·일기·합친 영상 파일까지)
+  → 204 (본문 없음)   | 404 { "error": "not_found" }
+  ※ processing 중이어도 삭제 가능(생성이 끝나도 되살아나지 않음). 지운 날짜는 바로 다시 POST 가능
 ```
 - 편집 플랜 규칙(서버가 보정, #31): `clipDuration`은 항상 템플릿 기본값 · 총 길이 10~30초(짧으면 클립 반복, 길면 잘라냄) · 올린 미디어는 모두 한 번 이상 사용 · `caption`은 emotional·review만(15자) · `captionEn`(30자)·`flashMontage`는 emotional만 — 몽타주는 사진 6장 이상일 때만, 아니면 `null` · closeup의 `fixedText.title`은 `\n` 3줄, `subtitle`은 `null`
 
