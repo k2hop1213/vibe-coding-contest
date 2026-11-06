@@ -52,6 +52,47 @@ function seek(v: HTMLVideoElement, sec: number): Promise<void> {
   })
 }
 
+const FRAME_S = 1 / FPS
+const MAX_PLAY_AHEAD_S = 1 // 이보다 멀리 앞이면 재생으로 따라가지 않고 바로 탐색
+
+/**
+ * 동영상을 목표 시각으로 옮기는 방법 (순수 함수, 테스트 대상).
+ * - draw: 이미 그 프레임 근처 → 그대로 그림
+ * - play: 조금 앞 → 짧게 재생해서 따라감 (프레임마다 seek하면 키프레임부터 다시 디코딩해서 매우 느림)
+ * - seek: 뒤로 가야 하거나(반복 재생의 처음) 너무 멀리 앞 → 탐색
+ */
+export function videoStep(current: number, target: number): 'draw' | 'play' | 'seek' {
+  const d = target - current
+  if (Math.abs(d) < FRAME_S / 2) return 'draw'
+  if (d > 0 && d <= MAX_PLAY_AHEAD_S) return 'play'
+  return 'seek'
+}
+
+/**
+ * 재생해서 target까지 따라간 뒤 멈춘다. 화면에 붙지 않은 <video>는 requestVideoFrameCallback이
+ * 불리지 않아서, 브라우저에 일을 넘겨 가며 currentTime을 직접 확인한다.
+ */
+async function playUntil(v: HTMLVideoElement, target: number): Promise<void> {
+  const deadline = performance.now() + 1500 // 재생이 막혀도 멈추지 않게
+  try {
+    await v.play()
+  } catch {
+    return seek(v, target)
+  }
+  while (v.currentTime < target - FRAME_S / 2 && !v.ended && performance.now() < deadline) {
+    await yieldToBrowser()
+  }
+  v.pause()
+}
+
+/** 동영상을 target초 프레임으로 맞춘다. 대부분 짧은 재생으로 따라가고, 되감기·먼 이동만 탐색 */
+async function advanceVideo(v: HTMLVideoElement, target: number): Promise<void> {
+  const step = videoStep(v.currentTime, target)
+  if (step === 'draw') return
+  if (step === 'play') return playUntil(v, target)
+  return seek(v, target)
+}
+
 export async function encodeReel(
   canvas: HTMLCanvasElement,
   reel: Reel,
@@ -90,7 +131,7 @@ export async function encodeReel(
       // 동영상 클립은 그 클립 안의 위치로 맞춘다 (앞부분부터 클립 길이만큼 = 자르기)
       const plan = framePlan(reel, ms, segs)
       const v = plan && media[plan.media]
-      if (plan && v instanceof HTMLVideoElement) await seek(v, videoTime(plan.local, v.duration))
+      if (plan && v instanceof HTMLVideoElement) await advanceVideo(v, videoTime(plan.local, v.duration))
       drawFrame(ctx, reel, media, ms)
       const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / FPS), duration: Math.round(1e6 / FPS) })
       encoder.encode(frame, { keyFrame: i % KEYFRAME_EVERY === 0 })
