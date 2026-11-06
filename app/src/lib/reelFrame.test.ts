@@ -25,10 +25,9 @@ describe('timeline / framePlan', () => {
     expect(totalDuration(base)).toBe(3000)
   })
 
-  test('사진은 1.00→1.05 확대, 동영상은 확대 없음', () => {
-    expect(framePlan(base, 0)?.zoom).toBe(1)
-    expect(framePlan(base, 999.9)?.zoom).toBeCloseTo(1.05)
-    expect(framePlan(base, 2500)).toMatchObject({ clip: 2, zoom: 1, local: 500 })
+  test('확대 없음: 프레임 계획에 배율이 없고 구간 안 시간만 진행', () => {
+    expect(framePlan(base, 999.9)).not.toHaveProperty('zoom')
+    expect(framePlan(base, 2500)).toMatchObject({ clip: 2, local: 500 })
   })
 
   test('끝을 넘으면 마지막 프레임에 머문다, 클립이 없으면 null', () => {
@@ -48,7 +47,7 @@ describe('timeline / framePlan', () => {
     expect(segs[1]).toMatchObject({ start: 2500, duration: FLASH_MS, media: 3 })
     expect(totalDuration(r)).toBe(2500 * 3 + FLASH_MS * 2)
     expect(mediaList(r).map((m) => m.type)).toEqual(['image', 'image', 'video', 'image', 'video'])
-    expect(framePlan(r, 2500 + 10)).toMatchObject({ clip: null, zoom: 1 })
+    expect(framePlan(r, 2500 + 10)).toMatchObject({ clip: null })
   })
 
   test('플래시 몽타주는 emotional이 아니면 무시', () => {
