@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1280" viewBox="0 0 720 1280">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7eb3"/><stop offset="1" stop-color="#ff758c"/></linearGradient></defs>
+<rect width="720" height="1280" fill="url(#g)"/>
+<circle cx="560" cy="300" r="180" fill="#7afcff" opacity="0.35"/>
+<circle cx="140" cy="900" r="260" fill="#7afcff" opacity="0.2"/>
+<text x="360" y="660" font-family="sans-serif" font-size="56" font-weight="700" fill="#fff" opacity="0.85" text-anchor="middle">SAMPLE 1 · 축제 첫날</text>
+</svg>
