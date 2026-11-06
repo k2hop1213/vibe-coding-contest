@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { drawFrame, framePlan, textLayout, timeline, totalDuration, VIDEO_H, VIDEO_W, type Drawable } from '../lib/reelFrame'
+import { clipSpan, drawFrame, framePlan, textLayout, timeline, totalDuration, VIDEO_H, VIDEO_W, type Drawable } from '../lib/reelFrame'
 import { loadMedia } from '../lib/recordReel'
 import type { Reel } from '../lib/types'
 
@@ -70,9 +70,9 @@ export default function ReelPlayer({ reel, autoPlay = true }: Props) {
   const toggle = () => setPaused((p) => !p)
   const clipCount = reel.clips.length
   const fill = (i: number) => {
-    const start = segs.find((s) => s.clip === i)
-    if (!start) return 0
-    return Math.min(1, Math.max(0, (ms - start.start) / start.duration))
+    const span = clipSpan(segs, i)
+    if (!span) return 0
+    return Math.min(1, Math.max(0, (ms - span.start) / span.duration))
   }
 
   return (

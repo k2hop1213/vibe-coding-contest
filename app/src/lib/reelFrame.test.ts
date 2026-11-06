@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { toPlan } from './api'
 import { pickMimeType } from './recordReel'
 import {
+  clipSpan,
   EN_COLOR,
   FLASH_MS,
   SAFE_BOTTOM,
@@ -49,6 +50,46 @@ describe('timeline / framePlan', () => {
     expect(totalDuration(r)).toBe(2500 * 3 + FLASH_MS * 2)
     expect(mediaList(r).map((m) => m.type)).toEqual(['image', 'image', 'video', 'image', 'video'])
     expect(framePlan(r, 2500 + 10)).toMatchObject({ clip: null, zoom: 1 })
+  })
+
+  test('같은 사진이 연속되면(서버가 0000011111로 늘림, #36) 하나의 긴 컷: 확대가 리셋되지 않고 이어진다', () => {
+    const cap = (url: string, caption: string): Clip => ({ ...clip(url), caption })
+    const r: Reel = {
+      template: 'review',
+      clipDuration: 1,
+      clips: [cap('a', '하나'), cap('a', '둘'), cap('a', '셋'), cap('b', '넷'), cap('b', '다섯')],
+    }
+    const segs = timeline(r)
+    expect(segs).toHaveLength(2)
+    expect(segs[0]).toMatchObject({ start: 0, duration: 3000, clip: 0, clipCount: 3, clipMs: 1000 })
+    expect(segs[1]).toMatchObject({ start: 3000, duration: 2000, clip: 3, clipCount: 2 })
+    expect(totalDuration(r)).toBe(5000)
+    // 1초 경계를 넘어도 확대가 1.00으로 돌아가지 않는다
+    const z1 = framePlan(r, 999)!.zoom
+    const z2 = framePlan(r, 1001)!.zoom
+    expect(z2).toBeGreaterThan(z1)
+    expect(framePlan(r, 2999)!.zoom).toBeCloseTo(1.05)
+    expect(framePlan(r, 3000)!.zoom).toBe(1) // 다른 사진으로 하드 컷
+    // 자막은 원래 클립 경계마다 바뀐다
+    expect([0, 1000, 2000, 3000, 4000].map((t) => framePlan(r, t)!.clip)).toEqual([0, 1, 2, 3, 4])
+    // 진행 바용: 합쳐진 구간 안의 클립도 자기 시간대를 안다
+    expect(clipSpan(segs, 1)).toEqual({ start: 1000, duration: 1000 })
+    expect(clipSpan(segs, 4)).toEqual({ start: 4000, duration: 1000 })
+  })
+
+  test('플래시 몽타주 경계에서는 같은 사진이어도 합치지 않는다', () => {
+    const r: Reel = {
+      template: 'emotional',
+      clipDuration: 2.5,
+      clips: [clip('a'), clip('a'), clip('b')],
+      flashMontage: { startIndex: 1, mediaUrls: ['/f1.jpg'] },
+    }
+    expect(timeline(r).map((s) => s.clip)).toEqual([0, null, 1, 2])
+  })
+
+  test('떨어져 있는 같은 사진(0 1 0)은 합치지 않는다', () => {
+    const r: Reel = { ...base, clips: [clip('a'), clip('b'), clip('a')] }
+    expect(timeline(r)).toHaveLength(3)
   })
 
   test('플래시 몽타주는 emotional이 아니면 무시', () => {
