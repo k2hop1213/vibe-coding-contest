@@ -68,13 +68,15 @@ GET  /api/styles
   → 200 { "styles": [ { "id": "festival", "label": "축제·MT", "emoji": "🎉" } ] }
 
 POST /api/entries        (multipart/form-data)
-  date: "2026-11-06"   diary: "..."   tags: ["festival"]   files: 이미지/동영상 1~10개
+  date: "2026-11-06"   diary: "..."   tags: "festival" (여러 개면 같은 키 반복: tags=festival&tags=calm)
+  files: 이미지/동영상 1~10개 (같은 키 반복)
   → 202 { "id": "e_123", "date": "2026-11-06", "status": "processing" }
-  | 400 { "error": "no_media" | "no_tag" | "invalid_date" }
+  | 400 { "error": "no_media" | "no_tag" | "invalid_date" | "too_many_media" }
   | 409 { "error": "already_exists" }        ← 하루 1개
 
 GET  /api/entries?month=2026-11
-  → 200 { "entries": [ { "id", "date", "status", "thumbnailUrl" } ] }
+  → 200 { "entries": [ { "id", "date", "status", "thumbnailUrl": "/media/.." | null } ] }   ← done일 때만 썸네일
+  | 400 { "error": "invalid_date" }         ← month가 YYYY-MM 형식이 아님
 
 GET  /api/entries/{id}
   → 200 { "id", "date", "diary", "tags": [..], "status": "processing" | "done" | "failed",
@@ -86,7 +88,7 @@ GET  /api/entries/{id}
   | 404 { "error": "not_found" }
 ```
 - 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지)
-- 업로드 파일은 `GET /media/{파일명}`으로 서빙
+- 업로드 파일은 `GET /media/{파일명}`으로 서빙. `mediaUrl`·`thumbnailUrl`은 상대 경로 → 프론트는 `mediaUrl()`(`app/src/lib/api.ts`)로 `API_BASE`를 붙여 쓴다
 
 ## 타임라인
 | 시각 | 목표 |
