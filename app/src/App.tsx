@@ -13,7 +13,8 @@ function App() {
   const [server, setServer] = useState<ServerState>('checking')
   const [view, setView] = useState({ year: now.getFullYear(), month0: now.getMonth() })
   const [selected, setSelected] = useState(today)
-  const [entries, setEntries] = useState<Record<string, EntrySummary>>({})
+  // 월별 캐시: 다른 달로 넘겨도 선택한 날짜의 기록을 잃지 않도록 (month → date → entry)
+  const [byMonth, setByMonth] = useState<Record<string, Record<string, EntrySummary>>>({})
   const [usingMock, setUsingMock] = useState(false)
 
   useEffect(() => {
@@ -31,7 +32,7 @@ function App() {
       .catch(() => ({ list: import.meta.env.DEV ? mockEntries(month) : [], mock: import.meta.env.DEV }))
       .then(({ list, mock }) => {
         if (cancelled) return
-        setEntries(Object.fromEntries(list.map((e) => [e.date, e])))
+        setByMonth((b) => ({ ...b, [month]: Object.fromEntries(list.map((e) => [e.date, e])) }))
         setUsingMock(mock)
       })
     return () => {
@@ -40,7 +41,7 @@ function App() {
   }, [view.year, view.month0])
 
   const move = (delta: number) => setView((v) => addMonths(v.year, v.month0, delta))
-  const entry = entries[selected]
+  const entry = byMonth[selected.slice(0, 7)]?.[selected]
   const [, m, d] = selected.split('-').map(Number)
   const weekday = WEEKDAY_KO[new Date(selected + 'T00:00').getDay()]
 
@@ -91,7 +92,7 @@ function App() {
             month0={view.month0}
             today={today}
             selected={selected}
-            entries={entries}
+            entries={byMonth[monthKey(view.year, view.month0)] ?? {}}
             onSelect={setSelected}
             onPrev={() => move(-1)}
             onNext={() => move(1)}

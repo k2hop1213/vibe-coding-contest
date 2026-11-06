@@ -64,3 +64,14 @@ test('다음 달로 넘기면 그 달 기록을 다시 불러온다', async () =
   expect(await screen.findByText('12월')).toBeInTheDocument()
   expect(fetchSpy).toHaveBeenCalledWith('/api/entries?month=2026-12')
 })
+
+test('기록 있는 날을 선택한 채 다른 달로 넘겨도 왼쪽 패널은 그 기록을 유지한다', async () => {
+  mockServer()
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: '11월 3일 (릴스 있음)' }))
+  fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
+  expect(await screen.findByText('12월')).toBeInTheDocument()
+  expect(screen.getByTestId('selected-date')).toHaveTextContent('11월 3일')
+  expect(screen.getByText(/이 날의 릴스/)).toBeInTheDocument()
+  expect(screen.queryByText(/아직 기록이 없어요/)).not.toBeInTheDocument()
+})
