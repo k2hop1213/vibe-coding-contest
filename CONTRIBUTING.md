@@ -106,8 +106,8 @@
 | 영역 | 담당자 | 브랜치 접두어 | GitHub |
 |------|--------|---------------|--------|
 | PM & Infra · 문서 | [이름] | `feat/infra-*` | [@k2hop1213](https://github.com/k2hop1213) |
-| Frontend | [이름] | `feat/ui-*` | [@TEAMMATE_B](https://github.com/TEAMMATE_B) |
-| Backend · AI | [이름] | `feat/api-*` | [@TEAMMATE_C](https://github.com/TEAMMATE_C) |
+| Frontend | [이름] | `feat/ui-*` | [@sijin2170](https://github.com/sijin2170) |
+| Backend · AI | [이름] | `feat/api-*` | [@songkh1201](https://github.com/songkh1201) |
 
 > PM(@k2hop1213)이 `main` 병합의 최종 관리자를 겸합니다.
 > 이 표와 `.github/CODEOWNERS`는 항상 서로 일치해야 합니다.

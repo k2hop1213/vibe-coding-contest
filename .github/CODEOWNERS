@@ -6,26 +6,25 @@
 #
 # 규칙은 "마지막 매칭 우선" — 아래로 갈수록, 더 구체적인 경로일수록 우선한다.
 #
-# TODO: @TEAMMATE_B / @TEAMMATE_C 를 실제 GitHub 아이디로 바꾼 뒤
-#       Settings → Branches 룰에서 "Require review from Code Owners"를 켤 것.
+# 팀원 아이디 반영 완료 → Settings → Branches 룰에서 "Require review from Code Owners"를 켤 것.
 #       (CONTRIBUTING.md 7장 표와 반드시 일치시킬 것)
 #
 # 페어링(순환): infra/docs=A+B · frontend=B+C · backend=C+A
-#   A = @k2hop1213 (PM)   B = @TEAMMATE_B   C = @TEAMMATE_C
+#   A = @k2hop1213 (PM)   B = @sijin2170   C = @songkh1201
 
 # 기본 소유자 (세부 규칙 미매칭 시): PM + 짝
-*                    @k2hop1213 @TEAMMATE_B
+*                    @k2hop1213 @sijin2170
 
 # 프론트엔드 · 앱 UI — 폴더명은 스택 정해지면 맞출 것 (/web/, /frontend/ 등)
-/app/                @TEAMMATE_B @TEAMMATE_C
+/app/                @sijin2170 @songkh1201
 
 # 백엔드 · 서버 · AI 연동
-/server/             @TEAMMATE_C @k2hop1213
+/server/             @songkh1201 @k2hop1213
 
 # 인프라 · CI · 환경
-/.github/            @k2hop1213 @TEAMMATE_C
-/.env.example        @k2hop1213 @TEAMMATE_C
+/.github/            @k2hop1213 @songkh1201
+/.env.example        @k2hop1213 @songkh1201
 
 # 문서
-/docs/               @k2hop1213 @TEAMMATE_B
-/README.md           @k2hop1213 @TEAMMATE_B
+/docs/               @k2hop1213 @sijin2170
+/README.md           @k2hop1213 @sijin2170
