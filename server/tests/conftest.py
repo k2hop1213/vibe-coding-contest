@@ -10,5 +10,7 @@ os.environ["STUB_DELAY_SECONDS"] = "0"
 
 @pytest.fixture(autouse=True)
 def fresh_db(tmp_path, monkeypatch):
-    """테스트마다 빈 DB"""
+    """테스트마다 빈 DB, Claude 호출 끔"""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
+    # .env에 실제 키가 있어도 테스트는 절대 Claude API를 부르지 않는다
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

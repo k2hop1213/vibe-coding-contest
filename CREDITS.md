@@ -26,6 +26,7 @@
 | FastAPI · Uvicorn | 백엔드 API 서버 | MIT · BSD-3 | https://fastapi.tiangolo.com · https://www.uvicorn.org |
 | python-multipart · python-dotenv | 업로드 처리 · 환경변수 | Apache-2.0 · BSD-3 | https://github.com/Kludex/python-multipart · https://github.com/theskumar/python-dotenv |
 | Anthropic Python SDK | Claude API 호출 | MIT | https://github.com/anthropics/anthropic-sdk-python |
+| Pillow | 업로드 사진을 Claude에 보내기 전 크기 축소·JPEG 변환 (`server/app/reel_ai.py`) | MIT-CMU (HPND) | https://python-pillow.org |
 | pytest · httpx · Ruff | 백엔드 테스트·린트 | MIT · BSD-3 · MIT | https://pytest.org · https://www.python-httpx.org · https://docs.astral.sh/ruff |
 
 ## 사용한 AI 도구 · API

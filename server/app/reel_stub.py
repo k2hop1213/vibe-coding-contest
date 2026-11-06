@@ -1,4 +1,4 @@
-"""AI 장면 생성 스텁 — #8(Claude 장면 생성)이 이 함수를 대체한다.
+"""AI 장면 생성 스텁 — ANTHROPIC_API_KEY가 없거나 Claude 호출이 실패했을 때 쓴다(app/reel_ai.py).
 
 올린 사진·동영상을 순서대로 장면으로 만들고, 일기를 문장 단위로 잘라 자막으로 붙인다.
 반환 모양은 docs/planning.md 계약의 reel과 같다.

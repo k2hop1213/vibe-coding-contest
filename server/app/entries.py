@@ -1,7 +1,7 @@
 """기록 API — docs/planning.md "API 계약"의 /api/entries.
 
 업로드 파일은 MEDIA_DIR에 랜덤 이름으로 저장하고 /media/{파일명}으로 서빙한다.
-릴스 생성은 응답(202) 뒤 백그라운드에서 돈다. 지금은 스텁(app/reel_stub.py), #8에서 Claude로 교체.
+릴스 생성은 응답(202) 뒤 백그라운드에서 돈다. Claude(app/reel_ai.py), 키가 없거나 실패하면 스텁(app/reel_stub.py).
 """
 
 import logging
@@ -16,7 +16,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 
-from app import db
+from app import db, reel_ai
 from app.config import media_dir, stub_delay_seconds
 from app.reel_stub import build_reel
 from app.styles import STYLE_IDS
@@ -100,16 +100,28 @@ def _delete_media(media: list[dict]) -> None:
         (media_dir() / Path(m["url"]).name).unlink(missing_ok=True)
 
 
+def make_reel(entry: dict) -> dict:
+    """ANTHROPIC_API_KEY가 있으면 Claude(#8), 없거나 실패하면 스텁.
+    데모에서 "실패" 화면이 뜨지 않도록 AI 실패는 스텁으로 대체한다(팀 결정)."""
+    if reel_ai.enabled():
+        try:
+            return reel_ai.build_reel(entry)
+        except Exception:  # API 오류·거절·응답 검증 실패 모두 스텁으로
+            logger.exception("Claude 장면 생성 실패, 스텁으로 대체: %s", entry["id"])
+    else:
+        delay = stub_delay_seconds()
+        if delay > 0:
+            time.sleep(delay)
+    return build_reel(entry)
+
+
 def generate_reel(entry_id: str) -> None:
     """백그라운드 작업: 릴스를 만들고 done/failed로 바꾼다."""
-    delay = stub_delay_seconds()
-    if delay > 0:
-        time.sleep(delay)
     entry = db.get_entry(entry_id)
     if entry is None:
         return
     try:
-        db.finish_entry(entry_id, "done", build_reel(entry))
+        db.finish_entry(entry_id, "done", make_reel(entry))
     except Exception:  # 어떤 오류든 "만드는 중"에 영원히 머물지 않게 failed 처리
         logger.exception("릴스 생성 실패: %s", entry_id)
         db.finish_entry(entry_id, "failed", None)
