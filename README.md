@@ -35,10 +35,34 @@ cp .env.example .env   # 실제 키 값 채우기 (커밋 금지)
 
 PR을 올렸으면 `/clear` 후 다음 작업 — 한 세션에 한 이슈.
 
-## 폴더 구조 (스택 확정 후 갱신)
+## 로컬 실행
+
+준비물: Node.js 24 LTS 이상, Python 3.13 이상
+
+```bash
+# 서버 (터미널 1)
+cd server
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements-dev.txt   # macOS/Linux: .venv/bin/python
+.venv/Scripts/python -m uvicorn app.main:app --reload         # http://localhost:8000/api/health
+```
+
+```bash
+# 앱 (터미널 2)
+cd app
+npm install
+npm run dev                                                   # http://localhost:5173
+```
+
+화면 오른쪽 위에 "서버 연결됨"이 보이면 둘 다 정상입니다.
+
+## 폴더 구조
 
 ```
-app/      프론트엔드
-server/   백엔드 · AI 연동
-docs/     기획 · 참고 문서
+app/      프론트엔드 — React + TypeScript + Vite + Tailwind
+  src/lib/api.ts   API 호출 (개발: vite 프록시 / 배포: VITE_API_BASE)
+server/   백엔드 · AI — FastAPI
+  app/main.py      API 진입점
+  tests/           pytest
+docs/     기획(planning.md) · 참고 문서
 ```
