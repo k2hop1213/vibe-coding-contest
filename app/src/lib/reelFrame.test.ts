@@ -3,6 +3,7 @@ import { toPlan } from './api'
 import { pickMimeType } from './recordReel'
 import {
   clipSpan,
+  videoTime,
   EN_COLOR,
   FLASH_MS,
   SAFE_BOTTOM,
@@ -76,6 +77,14 @@ describe('timeline / framePlan', () => {
     expect(timeline(r)).toHaveLength(1)
     // 동영상 위치(local)가 컷 경계(0.8초)에서 0으로 돌아가지 않는다
     expect([700, 900, 1700, 5000].map((t) => Math.round(framePlan(r, t)!.local))).toEqual([700, 900, 1700, 5000])
+  })
+
+  test('합쳐진 구간이 영상보다 길면 처음부터 반복 재생한다 (마지막 프레임에 멈추지 않음)', () => {
+    expect(videoTime(2500, 3)).toBeCloseTo(2.5)
+    expect(videoTime(3500, 3)).toBeCloseTo(0.5)
+    expect(videoTime(7200, 3)).toBeCloseTo(1.2)
+    expect(videoTime(1200, NaN)).toBeCloseTo(1.2) // 길이를 아직 모르면 그대로
+    expect(videoTime(1200, 0)).toBeCloseTo(1.2)
   })
 
   test('플래시 몽타주 경계에서는 같은 사진이어도 합치지 않는다', () => {

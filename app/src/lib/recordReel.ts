@@ -51,6 +51,7 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
     v.crossOrigin = 'anonymous'
     v.muted = true
     v.playsInline = true
+    v.loop = true // 합쳐진 긴 구간(#40)이 영상보다 길면 멈추지 않고 반복
     v.preload = 'auto'
     v.onloadeddata = () => resolve(v)
     v.onerror = () => reject(new Error(`동영상을 불러오지 못했어요: ${url}`))

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { clipSpan, drawFrame, framePlan, textLayout, timeline, totalDuration, VIDEO_H, VIDEO_W, type Drawable } from '../lib/reelFrame'
+import { clipSpan, drawFrame, videoTime, framePlan, textLayout, timeline, totalDuration, VIDEO_H, VIDEO_W, type Drawable } from '../lib/reelFrame'
 import { loadMedia } from '../lib/recordReel'
 import type { Reel } from '../lib/types'
 
@@ -53,7 +53,8 @@ export default function ReelPlayer({ reel, autoPlay = true }: Props) {
     media.current.forEach((m, i) => {
       if (!(m instanceof HTMLVideoElement)) return
       if (i !== plan.media || paused) return m.pause()
-      if (Math.abs(m.currentTime - plan.local / 1000) > 0.3) m.currentTime = plan.local / 1000
+      const want = videoTime(plan.local, m.duration) // 영상보다 긴 구간이면 반복
+      if (Math.abs(m.currentTime - want) > 0.3) m.currentTime = want
       if (m.paused) m.play().catch(() => undefined)
     })
     if (ctx) drawFrame(ctx, reel, media.current, ms)

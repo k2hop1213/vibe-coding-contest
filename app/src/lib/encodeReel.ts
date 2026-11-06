@@ -4,7 +4,7 @@
 // 실시간이 아니라서 보통 릴스 길이보다 빨리 끝나고, 결과는 항상 30fps로 고르다.
 // 출처: mp4-muxer (Vanilagy, MIT) https://github.com/Vanilagy/mp4-muxer — MP4 컨테이너 작성
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
-import { drawFrame, framePlan, timeline, totalDuration, type Drawable } from './reelFrame'
+import { drawFrame, framePlan, timeline, totalDuration, type Drawable, videoTime } from './reelFrame'
 import { loadMedia } from './recordReel'
 import type { Reel } from './types'
 
@@ -90,7 +90,7 @@ export async function encodeReel(
       // 동영상 클립은 그 클립 안의 위치로 맞춘다 (앞부분부터 클립 길이만큼 = 자르기)
       const plan = framePlan(reel, ms, segs)
       const v = plan && media[plan.media]
-      if (plan && v instanceof HTMLVideoElement) await seek(v, plan.local / 1000)
+      if (plan && v instanceof HTMLVideoElement) await seek(v, videoTime(plan.local, v.duration))
       drawFrame(ctx, reel, media, ms)
       const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / FPS), duration: Math.round(1e6 / FPS) })
       encoder.encode(frame, { keyFrame: i % KEYFRAME_EVERY === 0 })

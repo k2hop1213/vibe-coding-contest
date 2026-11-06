@@ -97,6 +97,15 @@ export function framePlan(reel: Reel, ms: number, segs: Segment[] = timeline(ree
   return { segment: i, media: s.media, clip, local }
 }
 
+/**
+ * 구간 안 시간(ms) → 동영상에서 보여 줄 위치(초). 같은 영상이 합쳐진 긴 구간(#40)이 영상보다 길면
+ * 마지막 프레임에 멈추지 않고 처음부터 반복 재생한다. 길이를 아직 모르면 그대로.
+ */
+export function videoTime(localMs: number, durationSec: number): number {
+  const t = Math.max(0, localMs / 1000)
+  return durationSec > 0 && Number.isFinite(durationSec) ? t % durationSec : t
+}
+
 export interface TextLine {
   text: string
   /** 화면 너비 대비. align이 center면 무시하고 가운데 */
