@@ -80,25 +80,7 @@ GET  /api/entries?month=2026-11
   → 200 { "entries": [ { "id", "date", "status", "thumbnailUrl": "/media/.." | null } ] }   ← done일 때만 썸네일
   | 400 { "error": "invalid_date" }         ← month가 YYYY-MM 형식이 아님
 
-GET  /api/entries/{id}
-  → 200 { "id", "date", "diary", "tags": [..], "status": "processing" | "done" | "failed",
-          "reel": null | {
-            "title": "축제 첫날",
-            "scenes": [ { "mediaUrl": "/media/..", "type": "image" | "video",
-                          "durationMs": 2500, "caption": "...", "transition": "fade" | "slide" | "zoom" } ]
-          } }
-  | 404 { "error": "not_found" }
-  ※ reel에 "videoUrl": "/media/.." | null — 장면을 하나로 합친 영상 (#27). null이면 아직 안 합침
-
-POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← #27
-  → 200 { "videoUrl": "/media/<uuid>.mp4" }
-  | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
-```
-### API 계약 v2 (예정 — 아직 코드에 없음. #31 서버 · #32 합성기 PR에서 위 계약을 이걸로 교체)
-> 구현 전까지는 **위의 현재 계약**을 따른다. v2로 바꾸는 PR이 이 섹션을 위로 올리고 지운다.
-> 앱(#32)은 v2로 바뀜 — 서버가 아직 옛 `title`·`scenes`를 주면 `toPlan()`(`app/src/lib/api.ts`)이 `review` 플랜으로 변환. #31 병합 때 `toPlan()` 제거
-```
-GET  /api/entries/{id}   (v2)
+GET  /api/entries/{id}   (v2 — #31 서버 · #32 합성기)
   → 200 { "id", "date", "diary", "tags": [..], "status": "processing" | "done" | "failed",
           "reel": null | {                               ← done = AI 편집 플랜 완성 (영상은 브라우저가 합쳐서 업로드)
             "template": "emotional" | "montage" | "review" | "closeup",
@@ -111,11 +93,15 @@ GET  /api/entries/{id}   (v2)
             "videoUrl": "/media/..mp4" | null           ← 합친 영상 720×1280·30fps (#28). null이면 아직 안 합침
           } }
   | 404 { "error": "not_found" }
-```
-- v2 규칙: 사진이 6장 미만이면 `flashMontage`는 `null`(생략) · `captionEn`은 30자 이내 · 총 길이 10~30초를 넘으면 서버가 클립 수를 줄인다
 
-- 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지). 렌더링 규칙 상세(v2)는 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md)
-- (v2) `tags`는 그대로 받되 **분위기 힌트**로만 쓴다(템플릿 선택·자막 말투). 전환 효과에는 영향 없음 (하드 컷 고정)
+POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← #27
+  → 200 { "videoUrl": "/media/<uuid>.mp4" }
+  | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
+```
+- 편집 플랜 규칙(서버가 보정, #31): `clipDuration`은 항상 템플릿 기본값 · 총 길이 10~30초(짧으면 클립 반복, 길면 잘라냄) · 올린 미디어는 모두 한 번 이상 사용 · `caption`은 emotional·review만(15자) · `captionEn`(30자)·`flashMontage`는 emotional만 — 몽타주는 사진 6장 이상일 때만, 아니면 `null` · closeup의 `fixedText.title`은 `\n` 3줄, `subtitle`은 `null`
+
+- 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지). 렌더링 규칙 상세는 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md)
+- `tags`는 그대로 받되 **분위기 힌트**로만 쓴다(템플릿 선택·자막 말투). 전환 효과에는 영향 없음 (하드 컷 고정)
 - 업로드 파일은 `GET /media/{파일명}`으로 서빙. `mediaUrl`·`thumbnailUrl`은 상대 경로 → 프론트는 `mediaUrl()`(`app/src/lib/api.ts`)로 `API_BASE`를 붙여 쓴다
 
 ## 타임라인

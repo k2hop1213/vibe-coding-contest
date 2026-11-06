@@ -48,39 +48,44 @@ class FakeClient:
         return r
 
 
-def _plan(*scenes, title="축제 첫날 🎉"):
-    return {"title": title, "scenes": list(scenes)}
+def _clip(i, caption="공연 시작", caption_en="Show time"):
+    return {"mediaIndex": i, "caption": caption, "captionEn": caption_en}
 
 
-def _scene(i, caption="자막", ms=1500, transition="zoom"):
-    return {"mediaIndex": i, "caption": caption, "durationMs": ms, "transition": transition}
+def _plan(*clips, template="review", fixed=None, flash=None, bpm=120):
+    if fixed is None and template != "emotional":
+        fixed = {"title": "서울 [성수]", "subtitle": "축제 첫날"}
+    return {"template": template, "bgmBpm": bpm, "fixedText": fixed, "clips": list(clips), "flashMontage": flash}
 
 
-def test_builds_reel_in_claude_order_and_clamps():
+def test_builds_plan_in_claude_order():
     media = [{"url": _jpeg_file("a.jpg"), "type": "image"}, {"url": "/media/v.mp4", "type": "video"}]
-    client = FakeClient(_plan(_scene(1, "영상 먼저!", 99999, "slide"), _scene(0, "공연 시작", 10, "zoom")))
+    client = FakeClient(_plan(_clip(1, "영상 먼저!"), _clip(0, "공연 시작")))
 
     reel = reel_ai.build_reel(_entry(media), client=client)
 
-    assert reel["title"] == "축제 첫날 🎉"
-    assert [s["mediaUrl"] for s in reel["scenes"]] == ["/media/v.mp4", media[0]["url"]]
-    assert [s["type"] for s in reel["scenes"]] == ["video", "image"]
-    assert [s["durationMs"] for s in reel["scenes"]] == [reel_ai.MAX_SCENE_MS, reel_ai.MIN_SCENE_MS]
-    assert reel["scenes"][0]["caption"] == "영상 먼저!"
-    assert set(reel["scenes"][0]) == {"mediaUrl", "type", "durationMs", "caption", "transition"}
+    assert reel["template"] == "review" and reel["clipDuration"] == 1.0
+    assert reel["fixedText"] == {"title": "서울 [성수]", "subtitle": "축제 첫날"}
+    assert [c["mediaUrl"] for c in reel["clips"][:2]] == ["/media/v.mp4", media[0]["url"]]
+    assert reel["clips"][0] == {"mediaUrl": "/media/v.mp4", "type": "video", "caption": "영상 먼저!", "captionEn": None}
+    assert reel["flashMontage"] is None
 
 
 def test_request_shape_model_schema_fallbacks_and_images():
     media = [{"url": _jpeg_file("big.jpg"), "type": "image"}, {"url": "/media/sample/1.svg", "type": "image"}]
-    client = FakeClient(_plan(_scene(0), _scene(1)))
+    client = FakeClient(_plan(_clip(0), _clip(1)))
     reel_ai.build_reel(_entry(media), client=client)
 
     call = client.calls[0]
     assert call["model"] == "claude-opus-5-5"
+    schema = call["output_config"]["format"]["schema"]
     assert call["output_config"]["format"]["type"] == "json_schema"
+    assert schema["properties"]["template"]["enum"] == ["emotional", "montage", "review", "closeup"]
+    assert "transition" not in json.dumps(schema), "하드 컷 고정 — 전환 필드 없음"
     assert call["output_config"]["effort"] == "low"
     assert call["fallbacks"] == "default" and call["betas"] == ["server-side-fallback-2026-07-01"]
-    assert "thinking" not in call  # Opus 5.5는 thinking 끌 수 없음 — 보내지 않는다
+    assert "thinking" not in call
+    assert "emotional" in call["system"] and "closeup" in call["system"]
 
     content = call["messages"][0]["content"]
     images = [b for b in content if b["type"] == "image"]
@@ -89,25 +94,26 @@ def test_request_shape_model_schema_fallbacks_and_images():
     assert img.format == "JPEG" and max(img.size) == reel_ai.MAX_IMAGE_SIDE
     text = " ".join(b["text"] for b in content if b["type"] == "text")
     assert "사진(미리보기 불가)" in text
-    assert "축제·MT" in text and "잔잔한 슬라이드쇼" in text
+    assert "분위기 힌트" in text and "축제·MT" in text and "잔잔한 슬라이드쇼" in text
     assert "축제 첫날!" in text
 
 
 @pytest.mark.parametrize(
     "bad",
     [
-        _plan(_scene(0)),  # 미디어 하나 빠짐
-        _plan(_scene(0), _scene(0)),  # 중복
-        _plan(_scene(0), _scene(5)),  # 범위 밖
-        _plan(_scene(0), _scene(1, transition="spin")),
+        _plan(_clip(0), _clip(5)),  # 범위 밖
+        _plan(_clip(0), _clip(1), template="spin"),  # 없는 템플릿
+        _plan(),  # clips 없음
+        _plan(_clip(0), _clip(1), template="montage", fixed=None) | {"fixedText": None},  # 고정 텍스트 누락
+        _plan(_clip(0), _clip(1, caption=None)),  # review인데 자막 없음
     ],
 )
 def test_invalid_plan_retries_once_then_succeeds(bad):
     media = [{"url": "/media/x.mp4", "type": "video"}, {"url": "/media/y.mp4", "type": "video"}]
-    client = FakeClient(bad, _plan(_scene(0), _scene(1)))
+    client = FakeClient(bad, _plan(_clip(0), _clip(1)))
     reel = reel_ai.build_reel(_entry(media), client=client)
     assert len(client.calls) == 2
-    assert len(reel["scenes"]) == 2
+    assert reel["template"] == "review"
 
 
 def test_invalid_twice_raises():
@@ -142,13 +148,13 @@ def test_uses_claude_when_key_set(monkeypatch):
 
     def fake_build(entry):
         seen.append(entry["id"])
-        return {"title": "AI 제목", "scenes": []}
+        return {"template": "closeup", "clips": []}
 
     monkeypatch.setattr(reel_ai, "build_reel", fake_build)
     entry_id = _post().json()["id"]
     detail = client.get(f"/api/entries/{entry_id}").json()
     assert seen == [entry_id]
-    assert detail["status"] == "done" and detail["reel"]["title"] == "AI 제목"
+    assert detail["status"] == "done" and detail["reel"]["template"] == "closeup"
 
 
 def test_claude_failure_falls_back_to_stub(monkeypatch):
@@ -161,7 +167,8 @@ def test_claude_failure_falls_back_to_stub(monkeypatch):
     entry_id = _post().json()["id"]
     detail = client.get(f"/api/entries/{entry_id}").json()
     assert detail["status"] == "done"
-    assert detail["reel"]["scenes"][0]["caption"] == "첫 문장.", "스텁 결과"
+    assert detail["reel"]["template"] == "closeup", "스텁 결과(미디어 1개 → closeup)"
+    assert detail["reel"]["fixedText"]["title"].split("\n")[1] == "첫 문장."
 
 
 def test_no_key_uses_stub_without_calling_claude(monkeypatch):
