@@ -162,11 +162,17 @@ def validate(plan: dict, entry: dict) -> dict:
 def _client() -> anthropic.Anthropic:
     # 데모 중 "만드는 중"이 길어지지 않게: 최악(30초 × 2회 × 검증 재시도 2회)에도 2분 안에 스텁으로 넘어간다.
     # 실측(BAZE 게이트웨이, 사진 2장): 약 5초
-    # .env에 빈 값(ANTHROPIC_BASE_URL=)이 있으면 SDK가 주소를 ""로 쓰므로 빈 값은 기본값/None으로 바꾼다
+    # .env에 빈 값(ANTHROPIC_BASE_URL=)이 있으면 SDK가 주소를 ""로 쓰므로 빈 값은 기본값/None으로 바꾼다.
+    # SDK는 api_key와 auth_token을 동시에 받지 않으므로(ValueError) 하나만 넘긴다: BAZE 토큰 우선.
+    token = os.getenv("ANTHROPIC_AUTH_TOKEN") or None
+    key = os.getenv("ANTHROPIC_API_KEY") or None
+    if token and key:
+        logger.warning("ANTHROPIC_AUTH_TOKEN과 ANTHROPIC_API_KEY가 둘 다 있어 AUTH_TOKEN(BAZE)만 씁니다")
+        key = None
     return anthropic.Anthropic(
         base_url=os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com",
-        api_key=os.getenv("ANTHROPIC_API_KEY") or None,
-        auth_token=os.getenv("ANTHROPIC_AUTH_TOKEN") or None,
+        api_key=key,
+        auth_token=token,
         timeout=30.0,
         max_retries=1,
     )

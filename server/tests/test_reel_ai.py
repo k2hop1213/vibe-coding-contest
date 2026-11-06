@@ -189,3 +189,13 @@ def test_client_ignores_empty_env_values(monkeypatch):
 
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://factchat-cloud.mindlogic.ai/v1/gateway/claude")
     assert str(reel_ai._client().base_url).startswith("https://factchat-cloud.mindlogic.ai/v1/gateway/claude")
+
+
+def test_client_prefers_baze_token_when_both_set(monkeypatch, caplog):
+    """둘 다 있으면 SDK가 ValueError → 모든 릴스가 조용히 스텁이 되던 문제"""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "old-anthropic-key")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "baze-token")
+    with caplog.at_level("WARNING"):
+        c = reel_ai._client()
+    assert c.auth_token == "baze-token" and c.api_key is None
+    assert "둘 다" in caplog.text
