@@ -5,11 +5,11 @@
 실제 인스타그램 릴스 5개를 분석해서 만든 영상 생성 규칙이다. (컷 길이·텍스트 배치 등 **스타일만 분석**, 영상·음원은 사용하지 않음 — 출처는 아래 및 `CREDITS.md`) 사용자가 올린 일기·사진·영상을 이 규칙대로 렌더링해 실제 릴스와 비슷한 퀄리티를 내는 것이 목표다.
 
 **분석한 릴스 (출처)**
-- https://www.instagram.com/reels/DfW_1J4h4aK/
-- https://www.instagram.com/reels/DfWIvazqa2V/
-- https://www.instagram.com/reels/DfW4U5FSOOx/
-- https://www.instagram.com/reels/DfV6rJ0RuNx/
-- https://www.instagram.com/reels/DfYl6Ilh-wT/
+- @ruka_zzang — https://www.instagram.com/reels/DfW_1J4h4aK/
+- @min9ooram — https://www.instagram.com/reels/DfWIvazqa2V/
+- @muk__jjungsz — https://www.instagram.com/reels/DfW4U5FSOOx/
+- @adiavital0 — https://www.instagram.com/reels/DfV6rJ0RuNx/
+- @jongnogu_official — https://www.instagram.com/reels/DfYl6Ilh-wT/
 
 ## 1. 공통 규칙 (모든 템플릿)
 
