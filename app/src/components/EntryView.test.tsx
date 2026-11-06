@@ -56,3 +56,19 @@ test('녹화를 못 하는 브라우저(jsdom 등)에서 영상이 없으면 미
   expect(await screen.findByText('부스 투어!')).toBeInTheDocument()
   expect(screen.queryByLabelText('릴스 영상 합치는 화면')).not.toBeInTheDocument()
 })
+
+test('생성 중엔 ① AI 편집 단계, 완성되면 AI가 고른 템플릿을 보여준다', async () => {
+  const v2 = {
+    template: 'emotional', clipDuration: 2.5, bgmBpm: 90, fixedText: null, flashMontage: null,
+    clips: [{ mediaUrl: '/media/a.jpg', type: 'image', caption: '오늘도 수고', captionEn: 'Good job today' }],
+    videoUrl: '/media/r.mp4',
+  }
+  vi.spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(json(entry('processing')))
+    .mockResolvedValue(json({ ...entry('done'), reel: v2 }))
+  render(<EntryView id="e1" onStatus={() => {}} onRetry={() => {}} pollMs={5} />)
+
+  const steps = await screen.findByRole('list', { name: '릴스 만드는 단계' })
+  expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('AI 편집')
+  expect(await screen.findByTestId('template-badge')).toHaveTextContent('🎞️ 감성')
+})

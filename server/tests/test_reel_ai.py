@@ -66,7 +66,8 @@ def test_builds_plan_in_claude_order():
 
     assert reel["template"] == "review" and reel["clipDuration"] == 1.0
     assert reel["fixedText"] == {"title": "서울 [성수]", "subtitle": "축제 첫날"}
-    assert [c["mediaUrl"] for c in reel["clips"][:2]] == ["/media/v.mp4", media[0]["url"]]
+    urls = [c["mediaUrl"] for c in reel["clips"]]
+    assert [u for i, u in enumerate(urls) if i == 0 or urls[i - 1] != u] == ["/media/v.mp4", media[0]["url"]]
     assert reel["clips"][0] == {"mediaUrl": "/media/v.mp4", "type": "video", "caption": "영상 먼저!", "captionEn": None}
     assert reel["flashMontage"] is None
 

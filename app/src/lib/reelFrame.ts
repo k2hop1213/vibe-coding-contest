@@ -10,13 +10,11 @@ export const VIDEO_H = 1280
 
 export const FLASH_MS = 150 // 플래시 몽타주 한 장
 export const MIN_CLIP_MS = 300
-export const PHOTO_ZOOM = 0.05 // 사진은 클립 동안 1.00 → 1.05
 export const SAFE_TOP = 0.1 // 세이프존: 위 10%, 아래 15%에는 텍스트를 넣지 않는다
 export const SAFE_BOTTOM = 0.85
 export const COLOR_FILTER = 'contrast(1.05) saturate(1.1)' // 모든 클립 공통 색 보정
 export const EN_COLOR = '#F5D547'
 
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const isVideoUrl = (url: string) => /\.(mp4|mov|webm)(\?|$)/i.test(url)
 
 /** 그릴 미디어 목록: clips 다음에 플래시 몽타주 사진들. drawFrame의 media[i]가 이 순서 */
@@ -53,8 +51,8 @@ export function timeline(reel: Reel): Segment[] {
   }
   reel.clips.forEach((c, i) => {
     if (i === flashAt) flash.forEach((_, j) => push(FLASH_MS, reel.clips.length + j, null))
-    // 서버는 사진이 적은 날 같은 클립을 연속으로 늘린다(0000011111, #36).
-    // 컷마다 확대가 1.00으로 리셋되지 않도록 바로 앞 구간과 같은 미디어면 하나의 긴 컷으로 이어 붙인다.
+    // 서버는 미디어가 적은 날 같은 클립을 연속으로 늘린다(0000011111, #36).
+    // 컷마다 동영상이 처음으로 되감기지 않도록 바로 앞 구간과 같은 미디어면 하나의 긴 컷으로 이어 붙인다.
     // (자막은 원래 클립 경계마다 바뀌므로 clipMs 간격으로 계산 — framePlan 참고)
     const prev = segs[segs.length - 1]
     if (prev && prev.clip !== null && i !== flashAt && reel.clips[prev.clip].mediaUrl === c.mediaUrl) {
@@ -83,8 +81,6 @@ export interface FramePlan {
   clip: number | null
   /** 이 구간 안에서 지난 시간(ms) — 동영상 위치 */
   local: number
-  /** 사진 확대 배율 (동영상은 1) */
-  zoom: number
 }
 
 /** 릴스 시작부터 ms 지난 시점에 그릴 것. 끝을 넘으면 마지막 프레임에 머문다 */
@@ -94,12 +90,11 @@ export function framePlan(reel: Reel, ms: number, segs: Segment[] = timeline(ree
   if (i < 0) i = segs.length - 1
   const s = segs[i]
   const local = Math.min(s.duration, Math.max(0, ms - s.start))
-  const isVideo = mediaList(reel)[s.media]?.type === 'video'
-  // 플래시 몽타주는 0.15초라 확대 없이 그대로. 합쳐진 긴 컷은 구간 전체에 걸쳐 1.00→1.05로 이어서 확대
-  const zoom = isVideo || s.clip === null ? 1 : 1 + PHOTO_ZOOM * clamp01(local / s.duration)
-  // 합쳐진 구간 안에서도 자막은 원래 클립 경계마다 바뀐다
+  // 사진·동영상 모두 확대 없이 그대로 (팀 결정 11/06)
+  // 같은 미디어가 연속돼 합쳐진 긴 컷(#40)에서는 local이 이어지므로 동영상이 되감기지 않고 계속 재생된다.
+  // 자막은 원래 클립 경계마다 바뀐다
   const clip = s.clip === null ? null : s.clip + Math.min(s.clipCount - 1, Math.floor(local / s.clipMs))
-  return { segment: i, media: s.media, clip, local, zoom }
+  return { segment: i, media: s.media, clip, local }
 }
 
 export interface TextLine {
@@ -188,11 +183,11 @@ function mediaSize(m: Drawable) {
   return m instanceof HTMLVideoElement ? { w: m.videoWidth, h: m.videoHeight } : { w: m.naturalWidth, h: m.naturalHeight }
 }
 
-/** object-fit: cover + 가운데 기준 확대 */
-function drawCover(ctx: CanvasRenderingContext2D, m: Drawable, zoom: number, W: number, H: number) {
+/** object-fit: cover (가운데 기준, 확대 없음) */
+function drawCover(ctx: CanvasRenderingContext2D, m: Drawable, W: number, H: number) {
   const { w, h } = mediaSize(m)
   if (!w || !h) return
-  const s = Math.max(W / w, H / h) * zoom
+  const s = Math.max(W / w, H / h)
   const dw = w * s
   const dh = h * s
   ctx.drawImage(m, (W - dw) / 2, (H - dh) / 2, dw, dh)
@@ -239,7 +234,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, reel: Reel, media: (Dra
   if (m) {
     ctx.save()
     ctx.filter = COLOR_FILTER
-    drawCover(ctx, m, plan.zoom, W, H)
+    drawCover(ctx, m, W, H)
     ctx.restore()
   }
   textLayout(reel, plan.clip).forEach((t) => drawText(ctx, t, W, H))

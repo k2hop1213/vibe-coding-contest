@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { getEntry, withMediaUrls, type EntryDetail, type EntryStatus } from '../lib/api'
 import { canEncode } from '../lib/encodeReel'
 import { canRecord } from '../lib/recordReel'
+import GenerationSteps from './GenerationSteps'
+import { TEMPLATE_LABELS } from '../lib/templates'
 import ReelPlayer from './ReelPlayer'
 import ReelVideo from './ReelVideo'
 import ReelVideoMaker from './ReelVideoMaker'
@@ -62,6 +64,9 @@ export default function EntryView({ id, onStatus, onRetry, pollMs = POLL_MS, slo
     const video = videoUrl ?? reel.videoUrl
     return (
       <div className="mx-auto w-full max-w-[280px]">
+        <p className="mb-2 text-center text-xs text-neutral-500" data-testid="template-badge">
+          AI가 고른 템플릿 <span className="font-semibold text-neutral-800">{TEMPLATE_LABELS[reel.template] ?? reel.template}</span>
+        </p>
         {video ? (
           <ReelVideo src={video} fileName={`하루릴스_${detail.date}`} />
         ) : (canEncode() || canRecord()) && !skipVideo ? (
@@ -97,7 +102,10 @@ export default function EntryView({ id, onStatus, onRetry, pollMs = POLL_MS, slo
         <div className="absolute inset-0 animate-pulse bg-white/20" />
         <span className="text-4xl">🎬</span>
       </div>
-      <p className="mt-5 font-semibold text-neutral-700" role="status">
+      <div className="mt-5">
+        <GenerationSteps current="plan" />
+      </div>
+      <p className="mt-3 font-semibold text-neutral-700" role="status">
         {detail ? 'AI가 릴스를 편집하고 있어요' : '불러오는 중…'}
       </p>
       <p className="mt-1 text-sm text-neutral-500">

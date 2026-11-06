@@ -26,10 +26,9 @@ describe('timeline / framePlan', () => {
     expect(totalDuration(base)).toBe(3000)
   })
 
-  test('사진은 1.00→1.05 확대, 동영상은 확대 없음', () => {
-    expect(framePlan(base, 0)?.zoom).toBe(1)
-    expect(framePlan(base, 999.9)?.zoom).toBeCloseTo(1.05)
-    expect(framePlan(base, 2500)).toMatchObject({ clip: 2, zoom: 1, local: 500 })
+  test('확대 없음: 프레임 계획에 배율이 없고 구간 안 시간만 진행', () => {
+    expect(framePlan(base, 999.9)).not.toHaveProperty('zoom')
+    expect(framePlan(base, 2500)).toMatchObject({ clip: 2, local: 500 })
   })
 
   test('끝을 넘으면 마지막 프레임에 머문다, 클립이 없으면 null', () => {
@@ -49,10 +48,10 @@ describe('timeline / framePlan', () => {
     expect(segs[1]).toMatchObject({ start: 2500, duration: FLASH_MS, media: 3 })
     expect(totalDuration(r)).toBe(2500 * 3 + FLASH_MS * 2)
     expect(mediaList(r).map((m) => m.type)).toEqual(['image', 'image', 'video', 'image', 'video'])
-    expect(framePlan(r, 2500 + 10)).toMatchObject({ clip: null, zoom: 1 })
+    expect(framePlan(r, 2500 + 10)).toMatchObject({ clip: null })
   })
 
-  test('같은 사진이 연속되면(서버가 0000011111로 늘림, #36) 하나의 긴 컷: 확대가 리셋되지 않고 이어진다', () => {
+  test('같은 미디어가 연속되면(서버가 0000011111로 늘림, #36) 하나의 긴 컷: 자막은 클립마다, 시간은 이어서', () => {
     const cap = (url: string, caption: string): Clip => ({ ...clip(url), caption })
     const r: Reel = {
       template: 'review',
@@ -64,17 +63,19 @@ describe('timeline / framePlan', () => {
     expect(segs[0]).toMatchObject({ start: 0, duration: 3000, clip: 0, clipCount: 3, clipMs: 1000 })
     expect(segs[1]).toMatchObject({ start: 3000, duration: 2000, clip: 3, clipCount: 2 })
     expect(totalDuration(r)).toBe(5000)
-    // 1초 경계를 넘어도 확대가 1.00으로 돌아가지 않는다
-    const z1 = framePlan(r, 999)!.zoom
-    const z2 = framePlan(r, 1001)!.zoom
-    expect(z2).toBeGreaterThan(z1)
-    expect(framePlan(r, 2999)!.zoom).toBeCloseTo(1.05)
-    expect(framePlan(r, 3000)!.zoom).toBe(1) // 다른 사진으로 하드 컷
     // 자막은 원래 클립 경계마다 바뀐다
     expect([0, 1000, 2000, 3000, 4000].map((t) => framePlan(r, t)!.clip)).toEqual([0, 1, 2, 3, 4])
     // 진행 바용: 합쳐진 구간 안의 클립도 자기 시간대를 안다
     expect(clipSpan(segs, 1)).toEqual({ start: 1000, duration: 1000 })
     expect(clipSpan(segs, 4)).toEqual({ start: 4000, duration: 1000 })
+  })
+
+  test('동영상 하나를 늘린 날: 컷마다 처음으로 되감기지 않고 이어서 재생된다', () => {
+    const v: Clip = { mediaUrl: '/v.mp4', type: 'video' }
+    const r: Reel = { template: 'closeup', clipDuration: 0.8, fixedText: { title: 'a\nb\nc' }, clips: Array(13).fill(v) }
+    expect(timeline(r)).toHaveLength(1)
+    // 동영상 위치(local)가 컷 경계(0.8초)에서 0으로 돌아가지 않는다
+    expect([700, 900, 1700, 5000].map((t) => Math.round(framePlan(r, t)!.local))).toEqual([700, 900, 1700, 5000])
   })
 
   test('플래시 몽타주 경계에서는 같은 사진이어도 합치지 않는다', () => {

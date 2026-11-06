@@ -13,6 +13,8 @@ Claude(app/reel_ai.py)와 스텁(app/reel_stub.py)이 만든 "인덱스 기반" 
 형식이 틀려 고칠 수 없는 경우만 PlanError(→ Claude 재요청), 고칠 수 있는 건 서버가 보정한다.
 """
 
+import math
+
 TEMPLATES = ("emotional", "montage", "review", "closeup")
 # 템플릿 기본 컷 길이(초) — 모델이 다른 값을 줘도 이 값을 쓴다
 CLIP_DURATION = {"emotional": 2.5, "montage": 1.0, "review": 1.0, "closeup": 0.8}
@@ -124,14 +126,18 @@ def normalize(plan: dict, media: list[dict]) -> dict:
     flash = _flash(plan.get("flashMontage"), media, len(clips)) if template == "emotional" else None
     flash_s = len(flash["mediaUrls"]) * FLASH_FRAME_S if flash else 0.0
 
-    # 총 길이 10~30초: 길면 뒤에서 자르고, 짧으면 클립을 처음부터 반복해서 채운다
+    # 총 길이 10~30초: 길면 뒤에서 자르고, 짧으면 각 클립을 "제자리에서" 늘린다.
+    # 0101.. 처럼 번갈아 반복하면 사진이 1초마다 깜빡이므로 0000011111처럼 같은 클립을 연속으로 둔다
+    # → 합성기는 연속된 같은 미디어를 하나의 긴 컷(확대도 이어서)으로 그릴 수 있다.
     max_clips = max(1, int((MAX_TOTAL_S - flash_s) // duration))
     clips = clips[:max_clips]
-    base = list(clips)
-    while len(clips) * duration + flash_s < MIN_TOTAL_S and len(clips) < max_clips:
-        clips.append(dict(base[len(clips) % len(base)]))
+    need = min(max_clips, max(len(clips), math.ceil((MIN_TOTAL_S - flash_s) / duration - 1e-9)))
+    repeats = [need // len(clips) + (1 if i < need % len(clips) else 0) for i in range(len(clips))]
+    block_start = [sum(repeats[:i]) for i in range(len(clips))]
+    clips = [dict(c) for c, r in zip(clips, repeats, strict=True) for _ in range(r)]
     if flash:
-        flash["startIndex"] = min(flash["startIndex"], len(clips) - 1)
+        orig = min(flash["startIndex"], len(block_start) - 1)
+        flash["startIndex"] = block_start[orig]  # 원래 가리키던 클립 묶음의 시작
 
     bpm = plan.get("bgmBpm")
     bpm = bpm if isinstance(bpm, int) and BPM_RANGE[0] <= bpm <= BPM_RANGE[1] else DEFAULT_BPM
