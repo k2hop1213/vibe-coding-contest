@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,12 +9,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import entries, styles
+from app import db, entries, styles
 from app.config import media_dir
 
 load_dotenv()
 
-app = FastAPI(title="하루릴스 API")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    db.fail_stale_processing()
+    yield
+
+
+app = FastAPI(title="하루릴스 API", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def no_sniff(request: Request, call_next):
+    """업로드 파일을 브라우저가 다른 형식(HTML 등)으로 추측해 실행하지 않게"""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 # 개발: Vite(5173). 배포: ALLOWED_ORIGINS="https://xxx.vercel.app,..."
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")

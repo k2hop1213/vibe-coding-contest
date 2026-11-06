@@ -191,3 +191,55 @@ def test_wrong_field_type_returns_contract_error_format():
     res = client.post("/api/entries", data={"date": "2026-11-20", "tags": ["festival"], "files": "notafile"})
     assert res.status_code == 400
     assert res.json() == {"error": "invalid_request"}
+
+
+@pytest.mark.parametrize(
+    ("name", "ctype"),
+    [
+        ("x.html", "image/png"),  # 확장자 위조 → stored XSS (리뷰 재현 케이스)
+        ("x.svg", "image/svg+xml"),  # SVG는 스크립트 실행 가능
+        ("x.heic", "image/heic"),  # Chrome <img>가 못 그림
+        ("noext", "image/jpeg"),
+        ("x.mp4", "image/jpeg"),  # 종류와 확장자 불일치
+    ],
+)
+def test_rejects_unsafe_or_unsupported_media(name, ctype):
+    before = _media_files()
+    res = _post(files=[("files", (name, b"<script>alert(1)</script>", ctype))])
+    assert res.status_code == 400
+    assert res.json() == {"error": "invalid_media"}
+    assert _media_files() == before
+
+
+def test_media_served_with_nosniff_and_allowed_ext_kept():
+    res = _post(files=[("files", ("photo.JPEG", b"\xff\xd8x", "image/jpeg")), MP4])
+    scenes = client.get(f"/api/entries/{res.json()['id']}").json()["reel"]["scenes"]
+    assert scenes[0]["mediaUrl"].endswith(".jpeg") and scenes[1]["mediaUrl"].endswith(".mp4")
+    served = client.get(scenes[0]["mediaUrl"])
+    assert served.headers["x-content-type-options"] == "nosniff"
+    assert served.headers["content-type"] == "image/jpeg"
+
+
+def test_startup_marks_stale_processing_as_failed(monkeypatch):
+    """서버가 생성 도중 재시작되면 processing에 갇히지 않고 failed → 다시 올릴 수 있다"""
+    monkeypatch.setattr(entries, "generate_reel", lambda entry_id: None)
+    entry_id = _post().json()["id"]
+    with TestClient(app):  # lifespan(시작 처리) 실행
+        pass
+    assert client.get(f"/api/entries/{entry_id}").json()["status"] == "failed"
+    assert _post().status_code == 202, "failed가 됐으니 같은 날 다시 올릴 수 있다"
+
+
+def test_replace_failed_is_atomic(monkeypatch):
+    """삭제+삽입 중 삽입이 실패하면 기존 failed 기록은 그대로 남는다(롤백)"""
+    import sqlite3
+
+    from app import db
+
+    monkeypatch.setattr(entries, "build_reel", lambda entry: (_ for _ in ()).throw(RuntimeError("x")))
+    failed_id = _post().json()["id"]
+    row = {"id": "e_dup", "date": "2026-11-20", "diary": "", "tags": ["festival"], "media": [], "thumbnail": None}
+    db.insert_entry({**row, "id": "e_other", "date": "2026-11-21"})
+    with pytest.raises(sqlite3.IntegrityError):  # PK 충돌로 삽입 실패
+        db.insert_entry({**row, "id": "e_other"}, replace_failed_id=failed_id)
+    assert db.get_entry(failed_id)["status"] == "failed"

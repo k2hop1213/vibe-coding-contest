@@ -33,6 +33,9 @@ def connect():
         conn.executescript(SCHEMA)
         yield conn
         conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -47,9 +50,12 @@ def _row(row: sqlite3.Row | None) -> dict | None:
     return entry
 
 
-def insert_entry(entry: dict) -> None:
-    """같은 날짜가 이미 있으면 sqlite3.IntegrityError."""
+def insert_entry(entry: dict, replace_failed_id: str | None = None) -> None:
+    """같은 날짜가 이미 있으면 sqlite3.IntegrityError.
+    replace_failed_id: 같은 트랜잭션에서 먼저 지울 failed 기록 (실패하면 함께 롤백)."""
     with connect() as conn:
+        if replace_failed_id:
+            conn.execute("DELETE FROM entries WHERE id = ? AND status = 'failed'", (replace_failed_id,))
         conn.execute(
             "INSERT INTO entries (id, date, diary, tags, media, status, thumbnail)"
             " VALUES (?, ?, ?, ?, ?, 'processing', ?)",
@@ -82,9 +88,11 @@ def get_by_date(date: str) -> dict | None:
         return _row(conn.execute("SELECT * FROM entries WHERE date = ?", (date,)).fetchone())
 
 
-def delete_entry(entry_id: str) -> None:
+def fail_stale_processing() -> int:
+    """서버 시작 시: 백그라운드 작업은 재시작하면 사라지므로 processing으로 남은 기록을 failed로.
+    failed는 다시 올리면 덮어쓸 수 있어 그 날짜가 409로 막히지 않는다."""
     with connect() as conn:
-        conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+        return conn.execute("UPDATE entries SET status = 'failed' WHERE status = 'processing'").rowcount
 
 
 def list_month(month: str) -> list[dict]:
