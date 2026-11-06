@@ -12,6 +12,13 @@
 | Frontend | [이름] | [@sijin2170](https://github.com/sijin2170) |
 | Backend · AI | [이름] | [@songkh1201](https://github.com/songkh1201) |
 
+## 배포 주소
+
+- 앱: (배포 후 기입)
+- 서버: (배포 후 기입)
+
+배포 방법은 [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## 시작하기
 
 ```bash
@@ -55,6 +62,8 @@ npm run dev                                                   # http://localhost
 ```
 
 화면 오른쪽 위에 "서버 연결됨"이 보이면 둘 다 정상입니다.
+
+달력이 비어 있으면 데모 데이터를 채우세요: `cd server && .venv/Scripts/python -m app.seed` (자세한 옵션은 [docs/DEPLOY.md](docs/DEPLOY.md)).
 
 ## 폴더 구조
 

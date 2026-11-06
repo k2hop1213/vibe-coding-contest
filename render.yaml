@@ -1,0 +1,18 @@
+# Render Blueprint — 하루릴스 API 서버 (docs/DEPLOY.md 참고)
+# 무료 플랜은 디스크가 재시작 때 지워지므로, 시작할 때 DB가 비어 있으면 시드 데이터를 다시 채운다.
+services:
+  - type: web
+    name: haru-reels-api
+    runtime: python
+    plan: free
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.seed --if-empty && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY # 대시보드에서 직접 입력 (비우면 AI 없이 스텁으로 생성)
+        sync: false
+      - key: ALLOWED_ORIGINS # 예: https://haru-reels.vercel.app
+        sync: false
+      - key: STUB_DELAY_SECONDS
+        value: "2"
