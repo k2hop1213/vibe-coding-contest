@@ -1,4 +1,5 @@
-// 출처: 디자인 참고 — "One Page Calendar" by Laude Pirera Ardi (https://freebiesbug.com/figma-freebies/one-page-calendar/)
+// 출처: 디자인 참고 — "Calendar 2022 (One Page Calendar)" by Agensip (디자이너 Laude Pirera Ardi)
+//       원본 https://agensip.gumroad.com/l/calendar2022 · 소개 https://freebiesbug.com/figma-freebies/one-page-calendar/
 //       그라데이션 패널 · 큰 연도 · 오늘 날짜 주황 원 구성만 참고, 에셋·코드 미사용
 import { buildMonthGrid } from '../lib/calendar'
 import { mediaUrl, type EntrySummary } from '../lib/api'
