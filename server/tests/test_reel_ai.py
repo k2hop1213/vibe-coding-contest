@@ -169,3 +169,23 @@ def test_no_key_uses_stub_without_calling_claude(monkeypatch):
     entry_id = _post().json()["id"]
     assert client.get(f"/api/entries/{entry_id}").json()["status"] == "done"
     assert entries.reel_ai.enabled() is False
+
+
+@pytest.mark.parametrize("var", ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"])
+def test_enabled_with_anthropic_key_or_baze_token(monkeypatch, var):
+    assert reel_ai.enabled() is False
+    monkeypatch.setenv(var, "x")
+    assert reel_ai.enabled() is True
+
+
+def test_client_ignores_empty_env_values(monkeypatch):
+    """.env에 빈 줄(ANTHROPIC_BASE_URL=)이 남아 있어도 기본 주소를 쓴다"""
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "baze-token")
+    c = reel_ai._client()
+    assert str(c.base_url).startswith("https://api.anthropic.com")
+    assert c.api_key is None and c.auth_token == "baze-token"
+
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://factchat-cloud.mindlogic.ai/v1/gateway/claude")
+    assert str(reel_ai._client().base_url).startswith("https://factchat-cloud.mindlogic.ai/v1/gateway/claude")

@@ -50,7 +50,7 @@
 ## 기술 스택 (제안 — 팀 확인 필요)
 - Frontend (`app/`): React + TypeScript + Vite, Tailwind CSS. 릴스 플레이어는 CSS 애니메이션/Framer Motion
 - Backend (`server/`): Python FastAPI, 업로드 파일은 로컬 디스크, 데이터는 SQLite
-- AI: Claude API (사진 이해 + 장면 구성 JSON 생성)
+- AI: Claude API `claude-opus-5-5` (사진 이해 + 장면 구성 JSON 생성) — 학교 BAZE API Gateway 경유 (`server/.env`: `ANTHROPIC_BASE_URL`·`ANTHROPIC_AUTH_TOKEN`)
 - 배포: app → Vercel, server → Render (또는 데모는 로컬 + 터널)
 
 ## 역할 분담
@@ -103,3 +103,4 @@ GET  /api/entries/{id}
 - (11/06) 아이디어 확정: 사진+일기 → AI 릴스 + 달력 다이어리
 - (11/06) MVP 릴스는 영상 인코딩 대신 장면 JSON + 웹 플레이어 — 데모 안정성, 개발 시간 절약
 - (11/06) 작성 화면 레이아웃은 vStory 앱 화면을 참고 → CREDITS.md 기록
+- (11/06) Claude 호출은 학교 제공 BAZE API Gateway(Claude 호환 `/v1/gateway/claude`) 키로 — Anthropic 크레딧 없이 사용. 실측: 사진 2장 약 5초, 약 4.7k 토큰
