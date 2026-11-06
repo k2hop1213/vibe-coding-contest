@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { getEntry, withMediaUrls, type EntryDetail, type EntryStatus } from '../lib/api'
 import { canEncode } from '../lib/encodeReel'
 import { canRecord } from '../lib/recordReel'
-import DeleteEntryButton from './DeleteEntryButton'
 import GenerationSteps from './GenerationSteps'
 import { TEMPLATE_LABELS } from '../lib/templates'
 import ReelPlayer from './ReelPlayer'
@@ -17,14 +16,12 @@ type Props = {
   /** 상태가 바뀌면 달력 칸도 갱신하도록 알려준다 */
   onStatus: (status: EntryStatus) => void
   onRetry: () => void
-  /** 기록을 지운 뒤 — 그날 칸을 비우고 작성 폼으로 */
-  onDeleted: () => void
   pollMs?: number
   slowMs?: number
 }
 
 /** 기록 있는 날: processing이면 생성 중 화면(폴링) → done이면 플레이어 → failed면 다시 만들기 */
-export default function EntryView({ id, onStatus, onRetry, onDeleted, pollMs = POLL_MS, slowMs = SLOW_MS }: Props) {
+export default function EntryView({ id, onStatus, onRetry, pollMs = POLL_MS, slowMs = SLOW_MS }: Props) {
   const [detail, setDetail] = useState<EntryDetail | null>(null)
   const [error, setError] = useState(false)
   const [slow, setSlow] = useState(false)
@@ -77,7 +74,6 @@ export default function EntryView({ id, onStatus, onRetry, onDeleted, pollMs = P
         ) : (
           <ReelPlayer reel={reel} />
         )}
-        <DeleteEntryButton id={detail.id} onDeleted={onDeleted} />
       </div>
     )
   }
@@ -95,9 +91,6 @@ export default function EntryView({ id, onStatus, onRetry, onDeleted, pollMs = P
         >
           다시 만들기
         </button>
-        <div className="mt-3 w-full max-w-xs">
-          <DeleteEntryButton id={detail.id} onDeleted={onDeleted} />
-        </div>
       </Card>
     )
   }

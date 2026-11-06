@@ -101,9 +101,9 @@ test('기록 삭제 → 확인 → 그날 칸이 비고 다시 올릴 수 있다
   detail.e1 = { id: 'e1', date: '2026-11-06', diary: '', tags: [], status: 'failed', reel: null }
   render(<App />)
 
-  fireEvent.click(await screen.findByRole('button', { name: '🗑 기록 삭제하고 다시 올리기' }))
+  fireEvent.click(await screen.findByRole('button', { name: '기록 삭제' }))
   // 바로 지우지 않고 한 번 더 확인
-  expect(screen.getByRole('alertdialog', { name: '기록 삭제 확인' })).toBeInTheDocument()
+  expect(screen.getByRole('group', { name: '기록 삭제 확인' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '삭제' }))
 
   expect(await screen.findByRole('button', { name: '✨ 릴스 만들기' })).toBeInTheDocument()
@@ -115,7 +115,7 @@ test('삭제 확인에서 취소하면 아무것도 지우지 않는다', async 
   entries = [{ id: 'e1', date: '2026-11-06', status: 'failed', thumbnailUrl: null }]
   detail.e1 = { id: 'e1', date: '2026-11-06', diary: '', tags: [], status: 'failed', reel: null }
   render(<App />)
-  fireEvent.click(await screen.findByRole('button', { name: '🗑 기록 삭제하고 다시 올리기' }))
+  fireEvent.click(await screen.findByRole('button', { name: '기록 삭제' }))
   fireEvent.click(screen.getByRole('button', { name: '취소' }))
   expect(screen.getByRole('button', { name: '다시 만들기' })).toBeInTheDocument()
   expect(vi.mocked(globalThis.fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)

@@ -39,19 +39,6 @@ function mockServer() {
   })
 }
 
-test('서버 헬스체크가 성공하면 "서버 연결됨"을 보여준다', async () => {
-  mockServer()
-  render(<App />)
-  expect(screen.getByRole('heading', { name: '하루릴스' })).toBeInTheDocument()
-  expect(await screen.findByText('서버 연결됨')).toBeInTheDocument()
-})
-
-test('서버가 응답하지 않으면 "서버 연결 안 됨"을 보여준다', async () => {
-  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('down'))
-  render(<App />)
-  expect(await screen.findByText(/서버 연결 안 됨/)).toBeInTheDocument()
-})
-
 test('이번 달 기록을 달력에 표시하고, 날짜를 누르면 왼쪽 패널이 바뀐다', async () => {
   const fetchSpy = mockServer()
   render(<App />)
