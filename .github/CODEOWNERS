@@ -1,0 +1,31 @@
+# CODEOWNERS — 영역별 자동 리뷰어 지정 (짝 리뷰어 방식)
+#
+# 각 영역에 [담당자 + 짝 리뷰어] 2명을 지정한다.
+# GitHub은 PR 작성자 본인은 리뷰어로 요청하지 않으므로,
+# 담당자가 자기 영역을 작업해 PR을 올리면 "짝 리뷰어"가 자동 요청된다.
+#
+# 규칙은 "마지막 매칭 우선" — 아래로 갈수록, 더 구체적인 경로일수록 우선한다.
+#
+# TODO: @TEAMMATE_B / @TEAMMATE_C 를 실제 GitHub 아이디로 바꾼 뒤
+#       Settings → Branches 룰에서 "Require review from Code Owners"를 켤 것.
+#       (CONTRIBUTING.md 7장 표와 반드시 일치시킬 것)
+#
+# 페어링(순환): infra/docs=A+B · frontend=B+C · backend=C+A
+#   A = @k2hop1213 (PM)   B = @TEAMMATE_B   C = @TEAMMATE_C
+
+# 기본 소유자 (세부 규칙 미매칭 시): PM + 짝
+*                    @k2hop1213 @TEAMMATE_B
+
+# 프론트엔드 · 앱 UI — 폴더명은 스택 정해지면 맞출 것 (/web/, /frontend/ 등)
+/app/                @TEAMMATE_B @TEAMMATE_C
+
+# 백엔드 · 서버 · AI 연동
+/server/             @TEAMMATE_C @k2hop1213
+
+# 인프라 · CI · 환경
+/.github/            @k2hop1213 @TEAMMATE_C
+/.env.example        @k2hop1213 @TEAMMATE_C
+
+# 문서
+/docs/               @k2hop1213 @TEAMMATE_B
+/README.md           @k2hop1213 @TEAMMATE_B

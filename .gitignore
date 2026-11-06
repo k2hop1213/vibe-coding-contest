@@ -1,0 +1,31 @@
+# 환경변수 / 비밀
+.env
+.env.*
+!.env.example
+*.pem
+*service-account*.json
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+.vercel/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Claude Code 개인 설정
+.claude/settings.local.json
