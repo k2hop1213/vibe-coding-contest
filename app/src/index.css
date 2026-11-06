@@ -1,7 +1,13 @@
 @import "tailwindcss";
+/* 출처: Pretendard (https://github.com/orioncactus/pretendard, OFL-1.1) — npm 패키지로 자체 호스팅, 필요한 글자만 내려받는 dynamic subset */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
 
 :root {
-  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-family: var(--font-sans);
   color-scheme: light;
 }
 
