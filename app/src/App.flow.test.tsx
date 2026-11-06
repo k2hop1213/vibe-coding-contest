@@ -117,6 +117,6 @@ test('삭제 확인에서 취소하면 아무것도 지우지 않는다', async 
   render(<App />)
   fireEvent.click(await screen.findByRole('button', { name: '기록 삭제' }))
   fireEvent.click(screen.getByRole('button', { name: '취소' }))
-  expect(screen.getByRole('button', { name: '다시 만들기' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: '다시 만들기' })).toBeInTheDocument()
   expect(vi.mocked(globalThis.fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
 })

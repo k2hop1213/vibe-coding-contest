@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import EntryForm from './components/EntryForm'
 import DeleteEntryButton from './components/DeleteEntryButton'
@@ -7,6 +7,7 @@ import {
   createEntry,
   errorMessage,
   getEntries,
+  getHealth,
   ApiError,
   type EntryDraft,
   type EntrySummary,
@@ -15,6 +16,9 @@ import { addMonths, monthKey, toISODate } from './lib/calendar'
 import { mockEntries } from './lib/mockEntries'
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토']
+
+const WAKING_MS = 2500 // 서버 응답이 이보다 늦으면 '깨우는 중' 안내
+const RETRY_MS = 5000 // 연결 실패 시 다시 확인 간격
 
 function App() {
   const [now] = useState(() => new Date())
@@ -27,6 +31,40 @@ function App() {
   const [submitError, setSubmitError] = useState<{ date: string; message: string } | null>(null)
   const [retrying, setRetrying] = useState<string | null>(null) // failed 날짜를 다시 만드는 중
   const [reload, setReload] = useState(0) // 달력 다시 불러오기
+  // 서버 상태는 문제가 있을 때만 보여준다 (연결되면 아무것도 안 보임).
+  // Render 무료 서버는 잠들면 첫 요청에 최대 1분 → "기록 없음"과 구분되게 안내하고, 깨어나면 달력을 다시 불러온다
+  const [server, setServer] = useState<'checking' | 'ok' | 'waking' | 'down'>('checking')
+  const hadTrouble = useRef(false)
+
+  useEffect(() => {
+    const run = { stop: false, retry: undefined as ReturnType<typeof setTimeout> | undefined }
+    const slow = setTimeout(() => {
+      if (run.stop) return
+      hadTrouble.current = true
+      setServer((s) => (s === 'checking' ? 'waking' : s))
+    }, WAKING_MS)
+    const check = () =>
+      getHealth()
+        .then((h) => {
+          if (!h.ok) throw new Error('not ok')
+          if (run.stop) return
+          clearTimeout(slow)
+          setServer('ok')
+          if (hadTrouble.current) setReload((n) => n + 1) // 깨어났으니 비어 보이던 달력 다시 불러오기
+        })
+        .catch(() => {
+          if (run.stop) return
+          hadTrouble.current = true
+          setServer('down')
+          run.retry = setTimeout(check, RETRY_MS)
+        })
+    check()
+    return () => {
+      run.stop = true
+      clearTimeout(slow)
+      clearTimeout(run.retry)
+    }
+  }, [])
 
   useEffect(() => {
     const month = monthKey(view.year, view.month0)
@@ -80,8 +118,13 @@ function App() {
       <div className="flex w-full flex-col overflow-hidden bg-white md:min-h-[600px] md:flex-row md:rounded-3xl md:shadow-xl">
         {/* 왼쪽: 선택한 날짜 — 기록 있으면 릴스(#11), 없으면 작성 폼(#10) */}
         <main className="order-last flex min-w-0 flex-1 flex-col px-5 py-6 md:order-first md:px-10 md:py-8">
-          <header>
+          <header className="flex items-center justify-between gap-3">
             <h1 className="text-xl font-bold">하루릴스</h1>
+            {(server === 'waking' || server === 'down') && (
+              <span className="text-xs text-amber-600" role="status" data-testid="server-status">
+                {server === 'waking' ? '서버를 깨우는 중… (최대 1분)' : '서버에 연결하지 못했어요 · 다시 시도 중'}
+              </span>
+            )}
           </header>
 
           <div className="mt-6 flex items-center justify-between gap-3">

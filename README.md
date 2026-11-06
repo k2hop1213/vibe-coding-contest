@@ -61,7 +61,7 @@ npm install
 npm run dev                                                   # http://localhost:5173
 ```
 
-화면 오른쪽 위에 "서버 연결됨"이 보이면 둘 다 정상입니다.
+`http://localhost:8000/api/health`가 `{"ok":true}`이면 서버 정상입니다. 앱 오른쪽 위에 "서버에 연결하지 못했어요"가 보이면 서버가 꺼져 있는 것입니다(정상일 땐 아무 표시 없음).
 
 > 릴스 형식이 v2(편집 플랜, #31)로 바뀌었습니다. 이전에 로컬에서 만든 기록(v1 `scenes`)은 새 화면에서 열리지 않으니, 서버를 끄고 `server/haru.db`와 `server/media/`를 지운 뒤 다시 시작하세요.
 

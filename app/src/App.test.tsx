@@ -39,6 +39,21 @@ function mockServer() {
   })
 }
 
+test('서버가 정상이면 서버 상태 문구를 보여주지 않는다', async () => {
+  mockServer()
+  render(<App />)
+  expect(screen.getByRole('heading', { name: '하루릴스' })).toBeInTheDocument()
+  await screen.findByRole('button', { name: '11월 3일 (릴스 있음)' })
+  expect(screen.queryByTestId('server-status')).not.toBeInTheDocument()
+  expect(screen.queryByText(/서버 연결됨/)).not.toBeInTheDocument()
+})
+
+test('서버가 응답하지 않으면 연결 안 됨을 알려준다 (빈 달력과 구분)', async () => {
+  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('down'))
+  render(<App />)
+  expect(await screen.findByTestId('server-status')).toHaveTextContent('서버에 연결하지 못했어요')
+})
+
 test('이번 달 기록을 달력에 표시하고, 날짜를 누르면 왼쪽 패널이 바뀐다', async () => {
   const fetchSpy = mockServer()
   render(<App />)
