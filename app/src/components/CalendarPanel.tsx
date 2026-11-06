@@ -91,7 +91,7 @@ export default function CalendarPanel({
               className={`relative mx-auto flex aspect-[3/4] w-full max-w-12 items-center justify-center rounded-xl text-sm font-medium transition
                 ${isSelected ? 'ring-2 ring-white' : 'hover:bg-white/15'}
                 ${c.weekday === 6 && !thumb ? 'text-orange-200' : ''}`}
-              style={thumb ? { backgroundImage: `url("${thumb}")`, backgroundSize: 'cover' } : undefined}
+              style={thumb ? { backgroundImage: `url(${JSON.stringify(thumb)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
             >
               <span
                 className={`flex size-7 items-center justify-center rounded-full
