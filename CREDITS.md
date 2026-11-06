@@ -34,6 +34,7 @@
 | 이름 | 용도 |
 |---|---|
 | Claude Code (Anthropic) | 개발 보조 (바이브코딩) |
+| Claude API (`claude-opus-5-5`, Anthropic) — 학교 제공 BAZE API Gateway(Mindlogic, https://docs.mindlogic.ai) 경유 | 릴스 장면 구성·자막 생성 (`server/app/reel_ai.py`) |
 
 ## 협업 환경
 
