@@ -98,6 +98,7 @@ POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← 
   | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
 ```
 - 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지). 렌더링 규칙 상세는 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md)
+- 서버 보정(#31): `clipDuration`은 항상 템플릿 기본값, 총 길이는 10~30초로 클립을 반복·잘라 맞춤, 올린 미디어는 모두 한 번 이상 사용, `caption`은 emotional·review만(15자), `captionEn`·`flashMontage`는 emotional만(몽타주는 사진 6장 이상일 때만, 아니면 null), closeup의 `fixedText.title`은 `\n` 3줄·`subtitle`은 null
 - `tags`는 그대로 받되 **분위기 힌트**로만 쓴다(템플릿 선택·자막 말투). 전환 효과에는 영향 없음 (하드 컷 고정)
 - 업로드 파일은 `GET /media/{파일명}`으로 서빙. `mediaUrl`·`thumbnailUrl`은 상대 경로 → 프론트는 `mediaUrl()`(`app/src/lib/api.ts`)로 `API_BASE`를 붙여 쓴다
 
