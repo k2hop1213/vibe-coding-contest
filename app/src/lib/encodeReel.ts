@@ -4,7 +4,7 @@
 // 실시간이 아니라서 보통 릴스 길이보다 빨리 끝나고, 결과는 항상 30fps로 고르다.
 // 출처: mp4-muxer (Vanilagy, MIT) https://github.com/Vanilagy/mp4-muxer — MP4 컨테이너 작성
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
-import { drawFrame, framePlan, totalDuration, type Drawable } from './reelFrame'
+import { drawFrame, framePlan, timeline, totalDuration, type Drawable } from './reelFrame'
 import { loadMedia } from './recordReel'
 import type { Reel } from './types'
 
@@ -52,17 +52,6 @@ function seek(v: HTMLVideoElement, sec: number): Promise<void> {
   })
 }
 
-/** 장면 i가 몇 ms에 시작하는지 */
-function sceneStarts(reel: Reel): number[] {
-  const starts: number[] = []
-  let t = 0
-  for (const s of reel.scenes) {
-    starts.push(t)
-    t += Math.max(500, s.durationMs || 0)
-  }
-  return starts
-}
-
 export async function encodeReel(
   canvas: HTMLCanvasElement,
   reel: Reel,
@@ -92,20 +81,16 @@ export async function encodeReel(
 
   const total = totalDuration(reel)
   const frames = Math.ceil((total / 1000) * FPS)
-  const starts = sceneStarts(reel)
+  const segs = timeline(reel)
   try {
     for (let i = 0; i < frames; i++) {
       if (signal?.aborted) throw new DOMException('영상 만들기를 취소했어요', 'AbortError')
       if (encodeError) throw encodeError
       const ms = (i * 1000) / FPS
-      const { current, under } = framePlan(reel, ms)
-      // 동영상 장면은 그 장면 안의 위치로 맞춘다(전환 중 아래 깔린 장면은 끝 프레임)
-      for (const layer of [under, current]) {
-        const v = layer && media[layer.index]
-        if (v instanceof HTMLVideoElement) {
-          await seek(v, layer === current ? (ms - starts[layer.index]) / 1000 : v.duration)
-        }
-      }
+      // 동영상 클립은 그 클립 안의 위치로 맞춘다 (앞부분부터 클립 길이만큼 = 자르기)
+      const plan = framePlan(reel, ms, segs)
+      const v = plan && media[plan.media]
+      if (plan && v instanceof HTMLVideoElement) await seek(v, plan.local / 1000)
       drawFrame(ctx, reel, media, ms)
       const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / FPS), duration: Math.round(1e6 / FPS) })
       encoder.encode(frame, { keyFrame: i % KEYFRAME_EVERY === 0 })

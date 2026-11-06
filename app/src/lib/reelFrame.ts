@@ -1,93 +1,157 @@
-// 릴스 한 프레임을 캔버스에 그린다 (#27). ReelPlayer(CSS 애니메이션)와 같은 연출을 캔버스로 옮긴 것.
+// 릴스 편집 플랜(v2) 한 프레임을 캔버스에 그린다 — 규칙은 docs/REELS_TEMPLATES.md (#32)
+// - timeline(): 하드 컷 타임라인 (클립 + emotional 플래시 몽타주)
 // - framePlan(): 시각(ms) → 무엇을 어떻게 그릴지 (순수 함수, 테스트 대상)
+// - textLayout(): 템플릿별 텍스트 위치·크기 (화면 비율, 순수 함수)
 // - drawFrame(): framePlan을 실제 캔버스에 그림
-import { sceneDuration, tick } from '../components/reelClock'
-import type { Reel, Transition } from './types'
+import type { MediaType, Reel } from './types'
 
 export const VIDEO_W = 720
 export const VIDEO_H = 1280
 
-export const TRANSITION_MS = 450
-export const CAPTION_DELAY_MS = 150
-export const CAPTION_IN_MS = 500
-export const TITLE_MS = 1800
-const KEN_BURNS = 0.15
-
-export const totalDuration = (reel: Reel) => reel.scenes.reduce((sum, s) => sum + sceneDuration(s), 0)
+export const FLASH_MS = 150 // 플래시 몽타주 한 장
+export const MIN_CLIP_MS = 300
+export const PHOTO_ZOOM = 0.05 // 사진은 클립 동안 1.00 → 1.05
+export const SAFE_TOP = 0.1 // 세이프존: 위 10%, 아래 15%에는 텍스트를 넣지 않는다
+export const SAFE_BOTTOM = 0.85
+export const COLOR_FILTER = 'contrast(1.05) saturate(1.1)' // 모든 클립 공통 색 보정
+export const EN_COLOR = '#F5D547'
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-const easeOut = (t: number) => 1 - (1 - t) ** 3
+const isVideoUrl = (url: string) => /\.(mp4|mov|webm)(\?|$)/i.test(url)
 
-export interface Layer {
-  index: number
-  alpha: number
-  dx: number // 화면 너비 대비 가로 이동 (0 = 제자리, 1 = 한 화면 오른쪽)
-  scale: number // 전환용 배율 (켄번스와 별개)
-  progress: number // 장면 안 진행률 0~1 (켄번스·동영상 위치용)
+/** 그릴 미디어 목록: clips 다음에 플래시 몽타주 사진들. drawFrame의 media[i]가 이 순서 */
+export function mediaList(reel: Reel): { url: string; type: MediaType }[] {
+  const flash = (reel.flashMontage?.mediaUrls ?? []).map((url) => ({
+    url,
+    type: (isVideoUrl(url) ? 'video' : 'image') as MediaType,
+  }))
+  return [...reel.clips.map((c) => ({ url: c.mediaUrl, type: c.type })), ...flash]
 }
+
+export interface Segment {
+  start: number
+  duration: number
+  /** mediaList(reel) 안의 위치 */
+  media: number
+  /** 자막을 가져올 클립. 플래시 몽타주 구간은 null */
+  clip: number | null
+}
+
+export function timeline(reel: Reel): Segment[] {
+  const clipMs = Math.max(MIN_CLIP_MS, (reel.clipDuration || 0) * 1000)
+  const flash = reel.template === 'emotional' ? (reel.flashMontage?.mediaUrls ?? []) : []
+  const flashAt = Math.min(Math.max(0, reel.flashMontage?.startIndex ?? 0), reel.clips.length)
+  const segs: Segment[] = []
+  let t = 0
+  const push = (duration: number, media: number, clip: number | null) => {
+    segs.push({ start: t, duration, media, clip })
+    t += duration
+  }
+  reel.clips.forEach((_, i) => {
+    if (i === flashAt) flash.forEach((_, j) => push(FLASH_MS, reel.clips.length + j, null))
+    push(clipMs, i, i)
+  })
+  if (flashAt === reel.clips.length) flash.forEach((_, j) => push(FLASH_MS, reel.clips.length + j, null))
+  return segs
+}
+
+export const totalDuration = (reel: Reel) => timeline(reel).reduce((sum, s) => sum + s.duration, 0)
 
 export interface FramePlan {
-  under: Layer | null
-  current: Layer
-  caption: { text: string; alpha: number; dy: number } | null
-  title: { text: string; alpha: number; scale: number } | null
+  segment: number
+  media: number
+  clip: number | null
+  /** 이 구간 안에서 지난 시간(ms) — 동영상 위치 */
+  local: number
+  /** 사진 확대 배율 (동영상은 1) */
+  zoom: number
 }
 
-function enter(transition: Transition, t: number) {
-  const e = easeOut(clamp01(t))
-  if (transition === 'slide') return { alpha: 1, dx: 1 - e, scale: 1 }
-  if (transition === 'zoom') return { alpha: e, dx: 0, scale: 1.25 - 0.25 * e }
-  return { alpha: e, dx: 0, scale: 1 }
+/** 릴스 시작부터 ms 지난 시점에 그릴 것. 끝을 넘으면 마지막 프레임에 머문다 */
+export function framePlan(reel: Reel, ms: number, segs: Segment[] = timeline(reel)): FramePlan | null {
+  if (segs.length === 0) return null
+  let i = segs.findIndex((s) => ms < s.start + s.duration)
+  if (i < 0) i = segs.length - 1
+  const s = segs[i]
+  const local = Math.min(s.duration, Math.max(0, ms - s.start))
+  const isVideo = mediaList(reel)[s.media]?.type === 'video'
+  // 플래시 몽타주는 0.15초라 확대 없이 그대로
+  const zoom = isVideo || s.clip === null ? 1 : 1 + PHOTO_ZOOM * clamp01(local / s.duration)
+  return { segment: i, media: s.media, clip: s.clip, local, zoom }
 }
 
-/** 릴스 시작부터 ms 지난 시점에 그릴 것 */
-export function framePlan(reel: Reel, ms: number): FramePlan {
-  const { index, elapsed } = tick({ index: 0, elapsed: 0, loop: 0 }, ms, reel.scenes)
-  const scene = reel.scenes[index]
-  const dur = sceneDuration(scene)
-  // 첫 장면은 전환 없이 바로 보인다(앞 장면이 없으므로)
-  const t = index === 0 ? 1 : elapsed / TRANSITION_MS
-  const current: Layer = { index, progress: clamp01(elapsed / dur), ...enter(scene.transition, t) }
+export interface TextLine {
+  text: string
+  /** 화면 너비 대비. align이 center면 무시하고 가운데 */
+  x: number
+  /** 화면 높이 대비, 첫 줄 가운데 */
+  y: number
+  /** 화면 너비 대비 글자 크기 */
+  size: number
+  weight: number
+  color: string
+  align: 'center' | 'left'
+  serif?: boolean
+  /** 반투명 검은 배경 박스 (review 부제) */
+  box?: boolean
+}
 
-  const under: Layer | null =
-    index > 0 && elapsed < TRANSITION_MS ? { index: index - 1, alpha: 1, dx: 0, scale: 1, progress: 1 } : null
+const line = (t: Omit<TextLine, 'x' | 'weight' | 'color' | 'align'> & Partial<TextLine>): TextLine => ({
+  x: 0.5,
+  weight: 600,
+  color: '#fff',
+  align: 'center',
+  ...t,
+  y: Math.min(SAFE_BOTTOM, Math.max(SAFE_TOP, t.y)),
+})
 
-  const c = clamp01((elapsed - CAPTION_DELAY_MS) / CAPTION_IN_MS)
-  const caption = scene.caption && c > 0 ? { text: scene.caption, alpha: easeOut(c), dy: (1 - easeOut(c)) * 24 } : null
-
-  let title: FramePlan['title'] = null
-  if (index === 0 && reel.title && elapsed < TITLE_MS) {
-    const p = elapsed / TITLE_MS // ReelPlayer의 reel-title 키프레임과 같게: 0~20% 등장, 75~100% 퇴장
-    const alpha = p < 0.2 ? p / 0.2 : p > 0.75 ? (1 - p) / 0.25 : 1
-    const scale = p < 0.2 ? 0.9 + 0.1 * (p / 0.2) : p > 0.75 ? 1 + 0.05 * ((p - 0.75) / 0.25) : 1
-    title = { text: reel.title, alpha: clamp01(alpha), scale }
+/** 스펙 §2 템플릿별 텍스트. clip이 null(플래시 몽타주)이면 컷마다 바뀌는 자막은 없다 */
+export function textLayout(reel: Reel, clip: number | null): TextLine[] {
+  const c = clip === null ? null : reel.clips[clip]
+  const title = reel.fixedText?.title?.trim()
+  const subtitle = reel.fixedText?.subtitle?.trim()
+  const out: TextLine[] = []
+  switch (reel.template) {
+    case 'emotional':
+      if (c?.captionEn) out.push(line({ text: c.captionEn, y: 0.62, size: 0.03, weight: 500, color: EN_COLOR }))
+      if (c?.caption) out.push(line({ text: c.caption, y: c.captionEn ? 0.655 : 0.62, size: 0.045 }))
+      break
+    case 'montage':
+      if (title) out.push(line({ text: title.toUpperCase(), y: 0.22, size: 0.06, weight: 800 }))
+      if (subtitle) out.push(line({ text: subtitle, y: 0.26, size: 0.035, weight: 500 }))
+      break
+    case 'review':
+      if (title) out.push(line({ text: title, y: 0.19, size: 0.055, weight: 700, serif: true }))
+      if (subtitle) out.push(line({ text: subtitle, y: 0.235, size: 0.035, weight: 500, box: true }))
+      if (c?.caption) out.push(line({ text: c.caption, y: 0.72, size: 0.045 }))
+      break
+    case 'closeup':
+      ;(title ?? '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .forEach((text, i) => out.push(line({ text, x: 0.08, y: 0.65 + i * 0.04, size: 0.045, weight: 700, align: 'left' })))
+      break
   }
-  return { under, current, caption, title }
-}
-
-/** 켄번스: 짝수 장면은 줌인, 홀수 장면은 줌아웃 (ReelPlayer와 같은 방향) */
-export function kenBurns(index: number, progress: number) {
-  const p = clamp01(progress)
-  const zoom = index % 2 === 0 ? 1 + KEN_BURNS * p : 1 + KEN_BURNS * (1 - p)
-  const shift = index % 2 === 0 ? -0.02 * p : 0.02 * (1 - p) // 화면 대비 살짝 이동
-  return { zoom, shift }
+  return out
 }
 
 /** 한 줄 폭을 넘으면 단어 단위(공백 없으면 글자 단위)로 줄바꿈 */
 export function wrapText(text: string, maxWidth: number, measure: (s: string) => number, maxLines = 3): string[] {
   const tokens = text.includes(' ') ? text.split(/(\s+)/) : Array.from(text)
   const lines: string[] = []
-  let line = ''
+  let cur = ''
   for (const tok of tokens) {
-    const next = line + tok
-    if (line && measure(next.trimEnd()) > maxWidth) {
-      lines.push(line.trim())
-      line = tok.trimStart()
+    const next = cur + tok
+    if (cur && measure(next.trimEnd()) > maxWidth) {
+      lines.push(cur.trim())
+      cur = tok.trimStart()
     } else {
-      line = next
+      cur = next
     }
   }
-  if (line.trim()) lines.push(line.trim())
+  if (cur.trim()) lines.push(cur.trim())
   if (lines.length > maxLines) {
     const kept = lines.slice(0, maxLines)
     kept[maxLines - 1] = kept[maxLines - 1].replace(/.?$/, '…')
@@ -102,84 +166,59 @@ function mediaSize(m: Drawable) {
   return m instanceof HTMLVideoElement ? { w: m.videoWidth, h: m.videoHeight } : { w: m.naturalWidth, h: m.naturalHeight }
 }
 
-function drawCover(ctx: CanvasRenderingContext2D, m: Drawable, zoom: number, shift: number, W: number, H: number) {
+/** object-fit: cover + 가운데 기준 확대 */
+function drawCover(ctx: CanvasRenderingContext2D, m: Drawable, zoom: number, W: number, H: number) {
   const { w, h } = mediaSize(m)
   if (!w || !h) return
   const s = Math.max(W / w, H / h) * zoom
   const dw = w * s
   const dh = h * s
-  ctx.drawImage(m, (W - dw) / 2 + shift * W, (H - dh) / 2 + shift * H, dw, dh)
+  ctx.drawImage(m, (W - dw) / 2, (H - dh) / 2, dw, dh)
 }
 
-const FONT = '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif'
+const SANS = '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif'
+const SERIF = '"Nanum Myeongjo", "AppleMyungjo", "Batang", serif'
 
-function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, media: Drawable[], W: number, H: number) {
-  const m = media[layer.index]
-  if (!m) return
+function drawText(ctx: CanvasRenderingContext2D, t: TextLine, W: number, H: number) {
+  const size = Math.round(W * t.size)
+  const px = W / 360 // 스펙의 CSS px(폰 너비 360 기준)을 캔버스 크기로
   ctx.save()
-  ctx.globalAlpha = layer.alpha
-  ctx.translate(layer.dx * W + W / 2, H / 2)
-  ctx.scale(layer.scale, layer.scale)
-  ctx.translate(-W / 2, -H / 2)
-  const isVideo = m instanceof HTMLVideoElement
-  const { zoom, shift } = isVideo ? { zoom: 1, shift: 0 } : kenBurns(layer.index, layer.progress)
-  drawCover(ctx, m, zoom, shift, W, H)
+  ctx.font = `${t.weight} ${size}px ${t.serif ? SERIF : SANS}`
+  ctx.textAlign = t.align
+  ctx.textBaseline = 'middle'
+  const maxW = t.align === 'left' ? W * (1 - t.x - 0.08) : W * 0.84
+  const lines = wrapText(t.text, maxW, (s) => ctx.measureText(s).width, 2)
+  const lineH = size * 1.3
+  const x = t.align === 'left' ? W * t.x : W / 2
+  const y0 = H * t.y
+  if (t.box) {
+    const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + size
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(x - w / 2, y0 - lineH / 2 - size * 0.15, w, lineH * lines.length + size * 0.3)
+  }
+  // 흰색 + 약한 그림자 0 1px 4px rgba(0,0,0,0.5)
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'
+  ctx.shadowOffsetY = 1 * px
+  ctx.shadowBlur = 4 * px
+  ctx.fillStyle = t.color
+  lines.forEach((l, i) => ctx.fillText(l, x, y0 + i * lineH))
   ctx.restore()
 }
 
-function gradient(ctx: CanvasRenderingContext2D, y0: number, y1: number, from: string, to: string, W: number) {
-  const g = ctx.createLinearGradient(0, y0, 0, y1)
-  g.addColorStop(0, from)
-  g.addColorStop(1, to)
-  ctx.fillStyle = g
-  ctx.fillRect(0, Math.min(y0, y1), W, Math.abs(y1 - y0))
-}
-
-/** media[i]는 reel.scenes[i]의 이미지/동영상 요소 */
-export function drawFrame(ctx: CanvasRenderingContext2D, reel: Reel, media: Drawable[], ms: number) {
+/** media[i]는 mediaList(reel)[i]의 이미지/동영상 요소 (아직 없으면 검은 화면) */
+export function drawFrame(ctx: CanvasRenderingContext2D, reel: Reel, media: (Drawable | undefined)[], ms: number) {
   const W = ctx.canvas.width
   const H = ctx.canvas.height
-  const plan = framePlan(reel, ms)
-
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, W, H)
-  if (plan.under) drawLayer(ctx, plan.under, media, W, H)
-  drawLayer(ctx, plan.current, media, W, H)
-
-  gradient(ctx, 0, H * 0.14, 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0)', W)
-  gradient(ctx, H, H * 0.7, 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0)', W)
-
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-
-  if (plan.caption) {
-    const size = Math.round(W * 0.06)
-    ctx.font = `700 ${size}px ${FONT}`
-    const lines = wrapText(plan.caption.text, W * 0.84, (s) => ctx.measureText(s).width)
-    const lineH = size * 1.35
-    const baseY = H - H * 0.075 - (lines.length - 1) * lineH + plan.caption.dy
+  const plan = framePlan(reel, ms)
+  if (!plan) return
+  const m = media[plan.media]
+  if (m) {
     ctx.save()
-    ctx.globalAlpha = plan.caption.alpha
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'
-    ctx.shadowBlur = 12
-    ctx.fillStyle = '#fff'
-    lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + i * lineH))
+    ctx.filter = COLOR_FILTER
+    drawCover(ctx, m, plan.zoom, W, H)
     ctx.restore()
   }
-
-  if (plan.title) {
-    const size = Math.round(W * 0.095)
-    ctx.save()
-    ctx.globalAlpha = plan.title.alpha
-    ctx.translate(W / 2, H / 3)
-    ctx.scale(plan.title.scale, plan.title.scale)
-    ctx.font = `800 ${size}px ${FONT}`
-    ctx.shadowColor = 'rgba(0,0,0,0.55)'
-    ctx.shadowBlur = 18
-    ctx.fillStyle = '#fff'
-    wrapText(plan.title.text, W * 0.85, (s) => ctx.measureText(s).width, 2).forEach((l, i, arr) =>
-      ctx.fillText(l, 0, (i - (arr.length - 1) / 2) * size * 1.2),
-    )
-    ctx.restore()
-  }
+  textLayout(reel, plan.clip).forEach((t) => drawText(ctx, t, W, H))
 }

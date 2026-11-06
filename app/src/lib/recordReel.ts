@@ -1,7 +1,6 @@
 // 릴스를 캔버스에 실시간으로 그리며 MediaRecorder로 녹화해 영상 파일 하나로 만든다 (#27).
 // 서버 ffmpeg 합성은 무료 서버에서 너무 느려서(7초 영상에 수 분) 브라우저에서 합친다.
-import { sceneDuration } from '../components/reelClock'
-import { drawFrame, framePlan, totalDuration, type Drawable } from './reelFrame'
+import { drawFrame, framePlan, mediaList, totalDuration, type Drawable } from './reelFrame'
 import type { Reel } from './types'
 
 // 앞에 있을수록 우선: 인스타·카톡 등에 바로 올릴 수 있는 MP4(H.264)를 먼저 고른다
@@ -60,8 +59,9 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
   })
 }
 
+/** mediaList(reel) 순서(클립 → 플래시 몽타주)로 불러온다 */
 export const loadMedia = (reel: Reel): Promise<Drawable[]> =>
-  Promise.all(reel.scenes.map((s) => (s.type === 'video' ? loadVideo(s.mediaUrl) : loadImage(s.mediaUrl))))
+  Promise.all(mediaList(reel).map((m) => (m.type === 'video' ? loadVideo(m.url) : loadImage(m.url))))
 
 export interface RecordResult {
   blob: Blob
@@ -93,7 +93,7 @@ export async function recordReel(
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data)
   const stopped = new Promise<void>((resolve) => (recorder.onstop = () => resolve()))
 
-  // 동영상 장면: 그 장면이 시작될 때 처음부터 재생
+  // 동영상 클립: 그 클립이 시작될 때 처음부터 재생 (클립 길이가 지나면 하드 컷)
   let playing = -1
   const syncVideo = (index: number) => {
     if (index === playing) return
@@ -117,7 +117,8 @@ export async function recordReel(
         drawFrame(ctx, reel, media, total - 1)
         return resolve()
       }
-      syncVideo(framePlan(reel, ms).current.index)
+      const plan = framePlan(reel, ms)
+      if (plan) syncVideo(plan.media)
       drawFrame(ctx, reel, media, ms)
       onProgress?.(ms / total)
       requestAnimationFrame(frame)
@@ -134,6 +135,3 @@ export async function recordReel(
   onProgress?.(1)
   return { blob: new Blob(chunks, { type: mimeType.split(';')[0] }), mimeType }
 }
-
-export const reelLengthSeconds = (reel: Reel) =>
-  Math.round(reel.scenes.reduce((s, sc) => s + sceneDuration(sc), 0) / 1000)

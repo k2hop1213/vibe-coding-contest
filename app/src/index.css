@@ -14,31 +14,3 @@
 body {
   @apply bg-neutral-100 text-neutral-900 antialiased;
 }
-
-/* ── 릴스 플레이어 (components/ReelPlayer.tsx) ── */
-@keyframes reel-fade { from { opacity: 0 } to { opacity: 1 } }
-@keyframes reel-slide { from { transform: translateX(100%) } to { transform: translateX(0) } }
-@keyframes reel-zoom { from { opacity: 0; transform: scale(1.25) } to { opacity: 1; transform: scale(1) } }
-@keyframes reel-kenburns-in { from { transform: scale(1) } to { transform: scale(1.15) translate(-2%, -2%) } }
-@keyframes reel-kenburns-out { from { transform: scale(1.15) translate(2%, 2%) } to { transform: scale(1) } }
-@keyframes reel-caption { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes reel-title {
-  0% { opacity: 0; transform: scale(0.9) }
-  20%, 75% { opacity: 1; transform: scale(1) }
-  100% { opacity: 0; transform: scale(1.05) }
-}
-
-.reel-enter-fade { animation: reel-fade 450ms ease-out both }
-.reel-enter-slide { animation: reel-slide 400ms cubic-bezier(0.2, 0.8, 0.2, 1) both }
-.reel-enter-zoom { animation: reel-zoom 450ms ease-out both }
-.reel-kenburns-in { animation: reel-kenburns-in linear both }
-.reel-kenburns-out { animation: reel-kenburns-out linear both }
-.reel-caption { animation: reel-caption 500ms 150ms ease-out both }
-.reel-title { animation: reel-title 1800ms ease-in-out both }
-
-/* 일시정지하면 진행 중인 CSS 애니메이션도 같이 멈춘다 */
-.reel-paused * { animation-play-state: paused !important }
-
-@media (prefers-reduced-motion: reduce) {
-  .reel * { animation-duration: 1ms !important }
-}

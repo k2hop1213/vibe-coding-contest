@@ -1,36 +1,65 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Reel, Scene } from '../lib/types'
-import { segmentFill, tick, type PlayState } from './reelClock'
-
-const TITLE_MS = 1800 // 첫 장면 위에 제목을 띄우는 시간
-const TRANSITION_MS = 500 // 전환 동안 직전 장면을 아래층에 깔아 두는 시간
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { drawFrame, framePlan, textLayout, timeline, totalDuration, VIDEO_H, VIDEO_W, type Drawable } from '../lib/reelFrame'
+import { loadMedia } from '../lib/recordReel'
+import type { Reel } from '../lib/types'
 
 interface Props {
   reel: Reel
   autoPlay?: boolean
 }
 
-/** reel.scenes(JSON)를 9:16 화면에서 자동 재생하는 릴스 플레이어. 탭하면 일시정지/재생. */
+/** "영상 없이 미리보기": 합성기와 같은 drawFrame으로 캔버스에 반복 재생한다 (#32). 탭하면 일시정지/재생 */
 export default function ReelPlayer({ reel, autoPlay = true }: Props) {
-  const { scenes } = reel
-  const [state, setState] = useState<PlayState>({ index: 0, elapsed: 0, loop: 0 })
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const media = useRef<Drawable[]>([])
+  const [ms, setMs] = useState(0)
   const [paused, setPaused] = useState(!autoPlay)
+  const segs = useMemo(() => timeline(reel), [reel])
+  const total = useMemo(() => totalDuration(reel), [reel])
 
-  // requestAnimationFrame 시계: 일시정지 중에는 멈춘다
+  // 미디어는 불러오는 대로 그린다 (못 불러오면 검은 화면 + 텍스트)
   useEffect(() => {
-    if (paused || scenes.length === 0) return
+    const ctrl = new AbortController()
+    media.current = []
+    loadMedia(reel)
+      .then((m) => !ctrl.signal.aborted && (media.current = m))
+      .catch(() => undefined)
+    return () => {
+      ctrl.abort()
+      media.current.forEach((m) => m instanceof HTMLVideoElement && m.pause())
+    }
+  }, [reel])
+
+  // requestAnimationFrame 시계: 일시정지 중에는 멈추고, 끝나면 처음으로
+  useEffect(() => {
+    if (paused || total === 0) return
     const clock = { raf: 0, last: performance.now() }
     const frame = (now: number) => {
       const dt = now - clock.last
       clock.last = now
-      setState((s) => tick(s, dt, scenes))
+      setMs((t) => (t + Math.max(0, dt)) % total)
       clock.raf = requestAnimationFrame(frame)
     }
     clock.raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(clock.raf)
-  }, [paused, scenes])
+  }, [paused, total])
 
-  if (scenes.length === 0) {
+  const plan = framePlan(reel, ms, segs)
+
+  // 그리기 + 동영상 클립은 클립 안 위치에 맞춰 재생
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext('2d')
+    if (!plan) return
+    media.current.forEach((m, i) => {
+      if (!(m instanceof HTMLVideoElement)) return
+      if (i !== plan.media || paused) return m.pause()
+      if (Math.abs(m.currentTime - plan.local / 1000) > 0.3) m.currentTime = plan.local / 1000
+      if (m.paused) m.play().catch(() => undefined)
+    })
+    if (ctx) drawFrame(ctx, reel, media.current, ms)
+  })
+
+  if (!plan) {
     return (
       <div className="flex aspect-[9/16] w-full items-center justify-center rounded-2xl bg-neutral-900 text-sm text-neutral-400">
         재생할 장면이 없어요
@@ -38,12 +67,13 @@ export default function ReelPlayer({ reel, autoPlay = true }: Props) {
     )
   }
 
-  const { index, elapsed, loop } = state
-  const current = scenes[index]
-  const hasPrev = index > 0 || loop > 0
-  const under = hasPrev && elapsed < TRANSITION_MS ? (index - 1 + scenes.length) % scenes.length : null
-  const showTitle = index === 0 && elapsed < TITLE_MS && reel.title
   const toggle = () => setPaused((p) => !p)
+  const clipCount = reel.clips.length
+  const fill = (i: number) => {
+    const start = segs.find((s) => s.clip === i)
+    if (!start) return 0
+    return Math.min(1, Math.max(0, (ms - start.start) / start.duration))
+  }
 
   return (
     <div
@@ -58,99 +88,31 @@ export default function ReelPlayer({ reel, autoPlay = true }: Props) {
           toggle()
         }
       }}
-      className={`reel relative aspect-[9/16] w-full cursor-pointer select-none overflow-hidden rounded-2xl bg-black ${paused ? 'reel-paused' : ''}`}
+      className="relative aspect-[9/16] w-full cursor-pointer select-none overflow-hidden rounded-2xl bg-black"
     >
-      {/* 직전 장면을 아래에 깔아서 전환이 검은 화면이 아니라 이전 장면 위에서 일어나게 */}
-      {under !== null && (
-        <SceneMedia key={`under-${under}-${loop}`} scene={scenes[under]} index={under} paused still />
-      )}
-      <div key={`cur-${index}-${loop}`} className={`absolute inset-0 reel-enter-${current.transition}`}>
-        <SceneMedia scene={current} index={index} paused={paused} />
-      </div>
+      <canvas ref={canvasRef} width={VIDEO_W} height={VIDEO_H} className="absolute inset-0 h-full w-full" aria-hidden />
 
-      {/* 위쪽 그라데이션 + 장면별 진행 바 */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent" />
+      {/* 클립별 진행 바 */}
       <div className="absolute inset-x-3 top-3 flex gap-1" aria-hidden>
-        {scenes.map((_, i) => (
+        {Array.from({ length: clipCount }, (_, i) => (
           <div key={i} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/35">
-            <div className="h-full bg-white" style={{ width: `${segmentFill(i, state, scenes) * 100}%` }} />
+            <div className="h-full bg-white" style={{ width: `${fill(i) * 100}%` }} />
           </div>
         ))}
       </div>
 
-      {showTitle && (
-        <div
-          key={`title-${loop}`}
-          className="reel-title absolute inset-x-6 top-1/3 text-center text-3xl font-extrabold text-white drop-shadow-lg"
-        >
-          {reel.title}
-        </div>
-      )}
-
-      {/* 자막 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent" />
-      {current.caption && (
-        <p
-          key={`cap-${index}-${loop}`}
-          className="reel-caption absolute inset-x-5 bottom-8 text-center text-lg font-semibold leading-snug text-white drop-shadow"
-        >
-          {current.caption}
-        </p>
-      )}
+      {/* 캔버스 글자는 화면 읽기 프로그램이 못 읽으므로 같은 텍스트를 숨겨 둔다 */}
+      <p className="sr-only" aria-live="off">
+        {textLayout(reel, plan.clip).map((t, i) => (
+          <span key={i}>{t.text} </span>
+        ))}
+      </p>
 
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/50 text-3xl text-white">
-            ▶
-          </span>
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/50 text-3xl text-white">▶</span>
         </div>
       )}
     </div>
-  )
-}
-
-function SceneMedia({
-  scene,
-  index,
-  paused,
-  still = false,
-}: {
-  scene: Scene
-  index: number
-  paused: boolean
-  still?: boolean
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    const v = videoRef.current
-    if (!v) return
-    if (paused) v.pause()
-    else v.play()?.catch(() => {}) // 자동재생이 막혀도 화면 진행은 계속
-  }, [paused])
-
-  if (scene.type === 'video') {
-    return (
-      <video
-        ref={videoRef}
-        src={scene.mediaUrl}
-        className="absolute inset-0 h-full w-full object-cover"
-        muted
-        playsInline
-        autoPlay={!paused}
-        preload="auto"
-      />
-    )
-  }
-  // 이미지: 장면 길이 동안 천천히 줌(Ken Burns). 짝수/홀수 장면마다 방향을 바꾼다
-  const kenBurns = still ? '' : index % 2 === 0 ? 'reel-kenburns-in' : 'reel-kenburns-out'
-  return (
-    <img
-      src={scene.mediaUrl}
-      alt=""
-      draggable={false}
-      className={`absolute inset-0 h-full w-full object-cover ${kenBurns}`}
-      style={{ animationDuration: `${scene.durationMs}ms` }}
-    />
   )
 }
