@@ -61,6 +61,13 @@ function App() {
   const putEntry = (e: EntrySummary) =>
     setByMonth((b) => ({ ...b, [e.date.slice(0, 7)]: { ...b[e.date.slice(0, 7)], [e.date]: e } }))
 
+  const removeEntry = (date: string) =>
+    setByMonth((b) => {
+      const month = { ...b[date.slice(0, 7)] }
+      delete month[date]
+      return { ...b, [date.slice(0, 7)]: month }
+    })
+
   const submit = async (draft: EntryDraft) => {
     setSubmitError(null)
     setUpload({ date: draft.date, progress: 0 })
@@ -137,6 +144,11 @@ function App() {
                   if (status === 'done') setReload((n) => n + 1) // 썸네일 받아오기
                 }}
                 onRetry={() => setRetrying(selected)}
+                onDeleted={() => {
+                  removeEntry(entry.date)
+                  setSubmitError(null)
+                  setRetrying(null)
+                }}
               />
             </div>
           )}
