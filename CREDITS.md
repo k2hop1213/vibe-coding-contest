@@ -9,6 +9,7 @@
 | 무엇을 | 출처 (URL) | 라이선스 | 어디에 썼나 (파일) | 추가한 사람 |
 |---|---|---|---|---|
 | 기록 작성 화면 레이아웃 (일기 입력 · 스타일 태그 칩 · 사진/동영상 추가 버튼) | vStory 앱 화면 (디자인 참고, 코드 미사용) — URL 추가 필요 | — | (작성 화면 구현 시 기입) | @k2hop1213 |
+| 달력 홈 디자인 (그라데이션 패널 · 큰 연도 · 오늘 날짜 원) — "Calendar 2022 (One Page Calendar)" by Agensip (디자이너 Laude Pirera Ardi), 디자인만 참고·에셋/코드 미사용 | 원본: https://agensip.gumroad.com/l/calendar2022 · 소개: https://freebiesbug.com/figma-freebies/one-page-calendar/ | 명시 없음 (무료 배포) | `app/src/components/CalendarPanel.tsx`, `app/src/App.tsx` | @sijin2170 |
 | 예: 카드 뒤집기 애니메이션 | https://example.com/... | MIT | `app/src/components/Card.tsx` | @k2hop1213 |
 
 ## 사용한 라이브러리 · 프레임워크
