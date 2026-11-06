@@ -3,11 +3,14 @@
 
 3인 팀이 바이브코딩대회 결과물을 만드는 저장소입니다. 팀원 각자가 Claude Code로 작업합니다.
 
-## 프로젝트 (주제 발표 후 `/kickoff`가 채움)
+## 프로젝트
 - 주제: **AI로 다시 쓰는 대학생활** (예: AI 캠퍼스 사주풀이, 교수님과 나의 궁합) — 문제 해결을 넘어 새로운 경험을 만드는 창의적인 웹
-- 스택: [ ]
+- 아이디어: **하루릴스** — 사진·일기 + 스타일 태그 → AI 릴스(장면 JSON + 웹 플레이어) → 달력 다이어리. 상세·API 계약은 `docs/planning.md`
+- 스택: `app/` React 19 + TS + Vite + Tailwind v4 (테스트 Vitest, 린트 oxlint) · `server/` FastAPI (Python 3.13, 테스트 pytest, 린트 ruff) · Claude API
 - 폴더: `app/` = 프론트, `server/` = 백엔드·AI, `docs/` = 기획
-- 실행: `[ ]`   테스트: `[ ]`   린트: `[ ]`
+- 실행: `cd server && .venv/Scripts/python -m uvicorn app.main:app --reload` (8000) + `cd app && npm run dev` (5173, /api·/media는 8000으로 프록시)
+- 테스트: `cd app && npm test` · `cd server && .venv/Scripts/python -m pytest -q`
+- 린트: `cd app && npm run lint` · `cd server && .venv/Scripts/python -m ruff check .`
 
 ## 출처 표기 (대회 규칙, 필수)
 - 외부 코드·스니펫·튜토리얼·이미지·폰트·데이터를 참고하면 **같은 커밋에서** `CREDITS.md`에 추가하고 해당 코드 위에 `// 출처: <URL>` 주석. 출처를 모르는 코드는 넣지 않는다.

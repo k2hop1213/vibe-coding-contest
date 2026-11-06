@@ -14,7 +14,16 @@
 
 | 이름 | 용도 | 라이선스 | 링크 |
 |---|---|---|---|
-| | | | |
+| create-vite (`react-ts` 템플릿) | `app/` 초기 골격 생성 | MIT | https://github.com/vitejs/vite/tree/main/packages/create-vite |
+| React | UI | MIT | https://react.dev |
+| Vite | 개발 서버·번들러 | MIT | https://vite.dev |
+| Tailwind CSS | 스타일 | MIT | https://tailwindcss.com |
+| Vitest · Testing Library · jsdom | 프론트 테스트 | MIT | https://vitest.dev · https://testing-library.com |
+| oxlint | 프론트 린트 | MIT | https://oxc.rs |
+| FastAPI · Uvicorn | 백엔드 API 서버 | MIT · BSD-3 | https://fastapi.tiangolo.com · https://www.uvicorn.org |
+| python-multipart · python-dotenv | 업로드 처리 · 환경변수 | Apache-2.0 · BSD-3 | https://github.com/Kludex/python-multipart · https://github.com/theskumar/python-dotenv |
+| Anthropic Python SDK | Claude API 호출 | MIT | https://github.com/anthropics/anthropic-sdk-python |
+| pytest · httpx · Ruff | 백엔드 테스트·린트 | MIT · BSD-3 · MIT | https://pytest.org · https://www.python-httpx.org · https://docs.astral.sh/ruff |
 
 ## 사용한 AI 도구 · API
 
