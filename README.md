@@ -14,8 +14,8 @@
 
 ## 배포 주소
 
-- 앱: (배포 후 기입)
-- 서버: (배포 후 기입)
+- 앱: https://haru-reels.vercel.app
+- 서버: https://haru-reels-api.onrender.com (무료 플랜 — 15분 미사용 시 잠듦, 첫 요청 최대 1분)
 
 배포 방법은 [docs/DEPLOY.md](docs/DEPLOY.md).
 
