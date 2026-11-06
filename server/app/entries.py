@@ -161,13 +161,19 @@ async def create_entry(
     if len(uploads) > MAX_FILES:
         return _error(400, "too_many_media")
 
-    if db.date_exists(d.isoformat()):
+    # 하루 하나. 단, 생성에 실패(failed)한 날은 새로 올리면 덮어쓴다
+    existing = db.get_by_date(d.isoformat())
+    if existing and existing["status"] != "failed":
         return _error(409, "already_exists")
 
     try:
         media = await _save_uploads(uploads)
     except _UploadError as e:
         return _error(400, e.code)
+
+    if existing:
+        db.delete_entry(existing["id"])
+        _delete_media(existing["media"])
 
     entry_id = f"e_{uuid.uuid4().hex[:12]}"
     try:

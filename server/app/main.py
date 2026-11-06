@@ -2,8 +2,10 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import entries, styles
@@ -21,6 +23,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
+    """FastAPI 기본 422 {detail: [...]} 대신 계약의 에러 형식으로 통일"""
+    return JSONResponse(status_code=400, content={"error": "invalid_request"})
 
 
 @app.get("/api/health")

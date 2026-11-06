@@ -158,3 +158,36 @@ def test_file_too_large_removes_partial_files(monkeypatch):
     assert _media_files() == before
     # 실패한 날짜는 다시 올릴 수 있다
     assert _post().status_code == 202
+
+
+def test_failed_day_can_be_recreated(monkeypatch):
+    """failed인 날은 409가 아니라 새로 만든다 (예전 파일은 지움)"""
+    real_build = entries.build_reel
+    fail = {"on": True}
+
+    def flaky(entry):
+        if fail["on"]:
+            raise RuntimeError("AI 실패")
+        return real_build(entry)
+
+    monkeypatch.setattr(entries, "build_reel", flaky)
+    old_id = _post().json()["id"]
+    assert client.get(f"/api/entries/{old_id}").json()["status"] == "failed"
+    files_after_fail = _media_files()
+
+    fail["on"] = False
+    res = _post()
+    assert res.status_code == 202
+    new_id = res.json()["id"]
+    assert new_id != old_id
+    assert client.get(f"/api/entries/{old_id}").status_code == 404
+    assert client.get(f"/api/entries/{new_id}").json()["status"] == "done"
+    month = client.get("/api/entries", params={"month": "2026-11"}).json()["entries"]
+    assert [e["id"] for e in month] == [new_id]
+    assert len(_media_files()) == len(files_after_fail), "예전 파일 1개 삭제 + 새 파일 1개"
+
+
+def test_wrong_field_type_returns_contract_error_format():
+    res = client.post("/api/entries", data={"date": "2026-11-20", "tags": ["festival"], "files": "notafile"})
+    assert res.status_code == 400
+    assert res.json() == {"error": "invalid_request"}

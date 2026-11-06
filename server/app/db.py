@@ -77,9 +77,14 @@ def get_entry(entry_id: str) -> dict | None:
         return _row(conn.execute("SELECT * FROM entries WHERE id = ?", (entry_id,)).fetchone())
 
 
-def date_exists(date: str) -> bool:
+def get_by_date(date: str) -> dict | None:
     with connect() as conn:
-        return conn.execute("SELECT 1 FROM entries WHERE date = ?", (date,)).fetchone() is not None
+        return _row(conn.execute("SELECT * FROM entries WHERE date = ?", (date,)).fetchone())
+
+
+def delete_entry(entry_id: str) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
 
 
 def list_month(month: str) -> list[dict]:
