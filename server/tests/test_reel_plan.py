@@ -100,3 +100,22 @@ def test_stub_builds_valid_plan_for_every_template(tags, media, template):
     assert 10 <= reel_plan.total_seconds(reel) <= 30
     if template == "emotional":
         assert reel["flashMontage"] and len(reel["flashMontage"]["mediaUrls"]) >= 6
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
+def test_short_reels_repeat_clips_contiguously_not_alternating(n):
+    """사진이 적은 날: 0101 깜빡임 대신 0000011111 — 같은 미디어는 연속으로 붙는다"""
+    plan = {"template": "montage", "fixedText": {"title": "SEOUL"}, "clips": [_clip(i) for i in range(n)]}
+    urls = [c["mediaUrl"] for c in normalize(plan, IMG[:n])["clips"]]
+    assert reel_plan.MIN_TOTAL_S <= len(urls) * 1.0
+    runs = [u for i, u in enumerate(urls) if i == 0 or urls[i - 1] != u]
+    assert runs == [m["url"] for m in IMG[:n]], f"미디어마다 한 덩어리여야 함: {urls}"
+
+
+def test_flash_start_points_to_start_of_repeated_block():
+    flash = {"startIndex": 1, "mediaIndexes": list(range(6))}
+    plan = {"template": "emotional", "clips": [_clip(0), _clip(1)], "flashMontage": flash}
+    out = normalize(plan, IMG[:6])
+    urls = [c["mediaUrl"] for c in out["clips"]]
+    start = out["flashMontage"]["startIndex"]
+    assert urls[start] == IMG[1]["url"] and urls[start - 1] == IMG[0]["url"]
