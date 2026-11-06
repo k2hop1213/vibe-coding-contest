@@ -16,7 +16,7 @@
 # 발표용: 팀이 직접 찍은 사진·영상 폴더로 (jpg·png·webp·gif·mp4·mov·webm)
 .venv/Scripts/python -m app.seed --photos ../demo
 
-# 장면 구성을 Claude로 (ANTHROPIC_API_KEY 필요, 기록당 API 1회 호출)
+# 장면 구성을 Claude로 (server/.env에 BAZE 게이트웨이 설정 필요, 기록당 API 1회 호출)
 .venv/Scripts/python -m app.seed --photos ../demo --ai
 ```
 
@@ -26,9 +26,12 @@
 
 ## 2. 서버 → Render
 
+> BAZE 게이트웨이 지원(#22)이 `main`에 병합된 뒤에 배포하세요. 그 전에는 토큰을 넣어도 스텁으로 생성됩니다.
+
 1. https://render.com 에 GitHub 계정으로 로그인 → **New → Blueprint** → 이 저장소 선택. `render.yaml`이 자동으로 읽힙니다.
 2. 환경변수 입력:
-   - `ANTHROPIC_API_KEY` — Claude API 키 (비우면 AI 없이 스텁으로 생성)
+   - `ANTHROPIC_AUTH_TOKEN` — 학교 BAZE 게이트웨이 키 (BAZE 사이트 > API Gateway에서 발급, 사용량은 발급한 계정으로 청구). 비우면 AI 없이 스텁으로 생성
+   - `ANTHROPIC_BASE_URL`은 `render.yaml`에 게이트웨이 주소로 이미 들어 있습니다. **`ANTHROPIC_API_KEY`는 같이 넣지 마세요** — 둘 다 있으면 SDK 오류로 항상 스텁이 됩니다
    - `ALLOWED_ORIGINS` — 3단계에서 받은 Vercel 주소 (예: `https://haru-reels.vercel.app`). 처음엔 비워 두고 3단계 후에 채워도 됩니다.
 3. 배포가 끝나면 `https://<서비스이름>.onrender.com/api/health`가 `{"ok":true}`인지 확인합니다.
 

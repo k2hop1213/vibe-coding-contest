@@ -10,7 +10,11 @@ services:
     startCommand: python -m app.seed --if-empty && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: ANTHROPIC_API_KEY # 대시보드에서 직접 입력 (비우면 AI 없이 스텁으로 생성)
+      # Claude — 학교 BAZE 게이트웨이 경유 (#22). 토큰을 비우면 AI 없이 스텁으로 생성
+      # ANTHROPIC_API_KEY는 함께 넣지 않는다 (둘 다 있으면 SDK 오류로 항상 스텁이 됨)
+      - key: ANTHROPIC_BASE_URL
+        value: https://factchat-cloud.mindlogic.ai/v1/gateway/claude
+      - key: ANTHROPIC_AUTH_TOKEN # 대시보드에서 직접 입력 (BAZE 사이트 > API Gateway에서 발급)
         sync: false
       - key: ALLOWED_ORIGINS # 예: https://haru-reels.vercel.app
         sync: false

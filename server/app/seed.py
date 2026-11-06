@@ -3,7 +3,7 @@
 사용법 (server/ 에서):
     python -m app.seed                       # 자동 생성한 샘플 사진으로 10일치
     python -m app.seed --photos ../demo      # 팀이 직접 찍은 사진·영상 폴더로 (발표용)
-    python -m app.seed --photos ../demo --ai # 장면 구성을 Claude로 (ANTHROPIC_API_KEY 필요, 기록당 1회 호출)
+    python -m app.seed --photos ../demo --ai # 장면 구성을 Claude로 (BAZE 토큰 또는 API 키 필요, 기록당 1회 호출)
     python -m app.seed --if-empty            # DB에 기록이 하나도 없을 때만 (배포 서버 시작 명령용)
 
 - 오늘 날짜는 비워 둔다 → 발표 때 오늘 칸에서 바로 새 기록을 만든다.
@@ -114,7 +114,7 @@ def seed(
     if if_empty and db.count_entries() > 0:
         return 0
     if use_ai and not reel_ai.enabled():
-        raise SystemExit("--ai를 쓰려면 ANTHROPIC_API_KEY가 필요합니다")
+        raise SystemExit("--ai를 쓰려면 server/.env에 Claude 설정(ANTHROPIC_AUTH_TOKEN 또는 ANTHROPIC_API_KEY)이 필요합니다")
 
     work_dir = work_dir or media_dir() / ".seed_tmp"
     work_dir.mkdir(parents=True, exist_ok=True)
