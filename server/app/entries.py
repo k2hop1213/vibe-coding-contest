@@ -30,8 +30,13 @@ _CHUNK = 1024 * 1024
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
-_EXT_RE = re.compile(r"^\.[a-z0-9]{1,5}$")
-_DEFAULT_EXT = {"image": ".jpg", "video": ".mp4"}
+# 저장 확장자는 허용 목록으로 고정한다. 파일명·content_type은 클라이언트가 정하는 값이라
+# 그대로 믿으면 x.html을 image/png로 올려 /media에서 text/html로 서빙되는 stored XSS가 된다.
+# SVG(스크립트 가능)·HEIC(Chrome <img>가 못 그림)도 받지 않는다.
+_ALLOWED_EXT = {
+    "image": {".jpg", ".jpeg", ".png", ".gif", ".webp"},
+    "video": {".mp4", ".mov", ".webm"},
+}
 
 
 class _UploadError(Exception):
@@ -52,27 +57,27 @@ def _parse_date(value: str | None) -> date | None:
         return None
 
 
-def _media_type(upload: UploadFile) -> str | None:
+def _media_kind(upload: UploadFile) -> tuple[str, str] | None:
+    """(종류, 저장 확장자). content_type의 종류와 파일 확장자가 허용 목록에서 서로 맞을 때만."""
     kind = (upload.content_type or "").split("/")[0]
-    return kind if kind in ("image", "video") else None
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext in _ALLOWED_EXT.get(kind, ()):
+        return kind, ext
+    return None
 
 
 async def _save_uploads(uploads: list[UploadFile]) -> list[dict]:
     """전부 저장하거나, 하나라도 실패하면 이미 쓴 파일을 지우고 _UploadError."""
-    for u in uploads:
-        if _media_type(u) is None:
-            raise _UploadError("invalid_media")
+    kinds = [_media_kind(u) for u in uploads]
+    if None in kinds:
+        raise _UploadError("invalid_media")
 
     folder = media_dir()
     folder.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []
     media: list[dict] = []
     try:
-        for u in uploads:
-            kind = _media_type(u)
-            ext = Path(u.filename or "").suffix.lower()
-            if not _EXT_RE.match(ext):
-                ext = _DEFAULT_EXT[kind]
+        for u, (kind, ext) in zip(uploads, kinds, strict=True):
             path = folder / f"{uuid.uuid4().hex}{ext}"
             saved.append(path)
             size = 0
@@ -171,12 +176,9 @@ async def create_entry(
     except _UploadError as e:
         return _error(400, e.code)
 
-    if existing:
-        db.delete_entry(existing["id"])
-        _delete_media(existing["media"])
-
     entry_id = f"e_{uuid.uuid4().hex[:12]}"
     try:
+        # failed 기록 덮어쓰기는 삭제+삽입을 한 트랜잭션으로 (중간에 실패하면 기존 기록 유지)
         db.insert_entry(
             {
                 "id": entry_id,
@@ -185,11 +187,14 @@ async def create_entry(
                 "tags": valid_tags,
                 "media": media,
                 "thumbnail": next((m["url"] for m in media if m["type"] == "image"), None),
-            }
+            },
+            replace_failed_id=existing["id"] if existing else None,
         )
     except sqlite3.IntegrityError:  # 동시에 같은 날짜로 두 번 들어온 경우
         _delete_media(media)
         return _error(409, "already_exists")
+    if existing:
+        _delete_media(existing["media"])
 
     background.add_task(generate_reel, entry_id)
     return {"id": entry_id, "date": d.isoformat(), "status": "processing"}
