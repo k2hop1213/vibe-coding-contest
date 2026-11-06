@@ -71,7 +71,8 @@ POST /api/entries        (multipart/form-data)
   date: "2026-11-06"   diary: "..."   tags: "festival" (여러 개면 같은 키 반복: tags=festival&tags=calm)
   files: 이미지/동영상 1~10개 (같은 키 반복)
   → 202 { "id": "e_123", "date": "2026-11-06", "status": "processing" }
-  | 400 { "error": "no_media" | "no_tag" | "invalid_date" | "too_many_media" }
+  | 400 { "error": "no_media" | "no_tag" | "invalid_date" | "too_many_media"
+          | "invalid_media" (이미지·동영상 아님) | "file_too_large" (개당 50MB 초과) }
   | 409 { "error": "already_exists" }        ← 하루 1개
 
 GET  /api/entries?month=2026-11

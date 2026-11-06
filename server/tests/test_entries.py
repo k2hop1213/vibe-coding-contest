@@ -1,25 +1,27 @@
+import os
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app import mock
+from app import entries
 from app.main import app
 
 client = TestClient(app)
 
 SCENE_KEYS = {"mediaUrl", "type", "durationMs", "caption", "transition"}
-
-
-@pytest.fixture(autouse=True)
-def _reset_created():
-    mock._created.clear()
-    yield
-    mock._created.clear()
+JPG = ("files", ("a.jpg", b"\xff\xd8fakejpeg", "image/jpeg"))
+MP4 = ("files", ("b.MP4", b"fakemp4", "video/mp4"))
 
 
 def _post(data=None, files=None):
-    data = {"date": "2026-11-20", "diary": "오늘 축제", "tags": ["festival"]} if data is None else data
-    files = [("files", ("a.jpg", b"x", "image/jpeg"))] if files is None else files
-    return client.post("/api/entries", data=data, files=files)
+    if data is None:
+        data = {"date": "2026-11-20", "diary": "축제 첫날! 공연까지 봤다.", "tags": ["festival"]}
+    return client.post("/api/entries", data=data, files=[JPG] if files is None else files)
+
+
+def _media_files() -> set[str]:
+    return set(os.listdir(os.environ["MEDIA_DIR"]))
 
 
 def test_styles_has_7_tags_with_contract_fields():
@@ -31,71 +33,90 @@ def test_styles_has_7_tags_with_contract_fields():
     assert {"id": "festival", "label": "축제·MT", "emoji": "🎉"} in styles
 
 
-def test_month_entries_shape_and_thumbnail_only_when_done():
-    res = client.get("/api/entries", params={"month": "2026-11"})
-    assert res.status_code == 200
-    entries = res.json()["entries"]
-    assert entries, "샘플 기록이 있어야 한다"
-    for e in entries:
-        assert set(e) == {"id", "date", "status", "thumbnailUrl"}
-        assert e["date"].startswith("2026-11-")
-        assert e["status"] in {"processing", "done", "failed"}
-        assert (e["thumbnailUrl"] is not None) == (e["status"] == "done")
+def test_create_saves_media_and_builds_reel_from_uploads():
+    res = _post(files=[JPG, MP4])
+    assert res.status_code == 202
+    body = res.json()
+    assert set(body) == {"id", "date", "status"}
+    assert body["date"] == "2026-11-20" and body["status"] == "processing"
+
+    # TestClient는 백그라운드 작업까지 끝낸 뒤 돌려준다 (스텁 대기 0초)
+    detail = client.get(f"/api/entries/{body['id']}").json()
+    assert set(detail) == {"id", "date", "diary", "tags", "status", "reel"}
+    assert detail["status"] == "done"
+    assert detail["tags"] == ["festival"]
+    assert detail["diary"] == "축제 첫날! 공연까지 봤다."
+
+    scenes = detail["reel"]["scenes"]
+    assert [s["type"] for s in scenes] == ["image", "video"]
+    assert all(set(s) == SCENE_KEYS for s in scenes)
+    assert all(s["transition"] in {"fade", "slide", "zoom"} for s in scenes)
+    assert [s["caption"] for s in scenes] == ["축제 첫날!", "공연까지 봤다."]
+    assert scenes[1]["mediaUrl"].endswith(".mp4")
+
+    # 올린 파일이 /media로 그대로 서빙된다
+    served = client.get(scenes[0]["mediaUrl"])
+    assert served.status_code == 200 and served.content == b"\xff\xd8fakejpeg"
 
 
-@pytest.mark.parametrize("month", [None, "2026-13", "2026-1", "abc"])
+def test_month_list_from_db_with_thumbnail():
+    assert client.get("/api/entries", params={"month": "2026-11"}).json() == {"entries": []}
+    a = _post().json()
+    _post({"date": "2026-12-01", "tags": ["calm"]})
+
+    listed = client.get("/api/entries", params={"month": "2026-11"}).json()["entries"]
+    assert len(listed) == 1
+    e = listed[0]
+    assert set(e) == {"id", "date", "status", "thumbnailUrl"}
+    assert e["id"] == a["id"] and e["status"] == "done"
+    assert e["thumbnailUrl"].startswith("/media/")
+
+
+def test_thumbnail_null_while_processing_and_for_video_only(monkeypatch):
+    monkeypatch.setattr(entries, "generate_reel", lambda entry_id: None)  # 생성 안 끝난 상태
+    _post()
+    e = client.get("/api/entries", params={"month": "2026-11"}).json()["entries"][0]
+    assert e["status"] == "processing" and e["thumbnailUrl"] is None
+    assert client.get(f"/api/entries/{e['id']}").json()["reel"] is None
+
+
+def test_generation_failure_marks_failed(monkeypatch):
+    def boom(entry):
+        raise RuntimeError("AI 실패")
+
+    monkeypatch.setattr(entries, "build_reel", boom)
+    entry_id = _post().json()["id"]
+    detail = client.get(f"/api/entries/{entry_id}").json()
+    assert detail["status"] == "failed" and detail["reel"] is None
+
+
+def test_entries_survive_new_connection():
+    """메모리가 아니라 SQLite에 저장된다"""
+    entry_id = _post().json()["id"]
+    assert Path(os.environ["DATABASE_PATH"]).exists()
+    assert TestClient(app).get(f"/api/entries/{entry_id}").status_code == 200
+
+
+@pytest.mark.parametrize("month", [None, "2026-13", "2026-00", "2026-1", "abc"])
 def test_month_invalid(month):
     res = client.get("/api/entries", params={"month": month} if month else {})
     assert res.status_code == 400
     assert res.json() == {"error": "invalid_date"}
 
 
-def test_entry_detail_done_has_reel_scenes():
-    res = client.get("/api/entries/e_2026-11-03")
-    assert res.status_code == 200
-    body = res.json()
-    assert set(body) == {"id", "date", "diary", "tags", "status", "reel"}
-    assert body["status"] == "done"
-    scenes = body["reel"]["scenes"]
-    assert scenes and all(set(s) == SCENE_KEYS for s in scenes)
-    assert all(s["transition"] in {"fade", "slide", "zoom"} for s in scenes)
-    # 샘플 이미지가 실제로 서빙되는지
-    assert client.get(scenes[0]["mediaUrl"]).status_code == 200
-
-
-def test_entry_detail_not_done_has_null_reel():
-    assert client.get("/api/entries/e_2026-11-09").json()["reel"] is None
-
-
-@pytest.mark.parametrize("entry_id", ["nope", "e_2026-11-04", "e_2026-02-30"])
-def test_entry_not_found(entry_id):
-    res = client.get(f"/api/entries/{entry_id}")
+def test_entry_not_found():
+    res = client.get("/api/entries/e_nope")
     assert res.status_code == 404
     assert res.json() == {"error": "not_found"}
 
 
-def test_create_returns_202_then_becomes_done(monkeypatch):
+def test_create_conflict_one_per_day():
+    assert _post().status_code == 202
+    before = _media_files()
     res = _post()
-    assert res.status_code == 202
-    body = res.json()
-    assert body["date"] == "2026-11-20" and body["status"] == "processing"
-
-    detail = client.get(f"/api/entries/{body['id']}").json()
-    assert detail["status"] == "processing" and detail["reel"] is None
-    assert detail["tags"] == ["festival"]
-
-    monkeypatch.setattr(mock, "PROCESSING_SECONDS", 0)
-    detail = client.get(f"/api/entries/{body['id']}").json()
-    assert detail["status"] == "done" and detail["reel"]["scenes"]
-
-    month = client.get("/api/entries", params={"month": "2026-11"}).json()["entries"]
-    assert any(e["id"] == body["id"] for e in month)
-
-
-def test_create_accepts_multiple_tags():
-    res = _post({"date": "2026-11-21", "tags": ["festival", "calm"]})
-    assert res.status_code == 202
-    assert client.get(f"/api/entries/{res.json()['id']}").json()["tags"] == ["festival", "calm"]
+    assert res.status_code == 409
+    assert res.json() == {"error": "already_exists"}
+    assert _media_files() == before, "409면 파일을 저장하지 않는다"
 
 
 @pytest.mark.parametrize(
@@ -112,17 +133,28 @@ def test_create_accepts_multiple_tags():
             [("files", (f"{i}.jpg", b"x", "image/jpeg")) for i in range(11)],
             "too_many_media",
         ),
+        (
+            {"date": "2026-11-20", "tags": ["festival"]},
+            [JPG, ("files", ("x.pdf", b"%PDF", "application/pdf"))],
+            "invalid_media",
+        ),
     ],
 )
 def test_create_validation_errors(data, files, code):
+    before = _media_files()
     res = _post(data, files)
     assert res.status_code == 400
     assert res.json() == {"error": code}
+    assert _media_files() == before
 
 
-def test_create_conflict_one_per_day():
-    assert _post({"date": "2026-11-03", "tags": ["festival"]}).status_code == 409  # 샘플 기록 있는 날
+def test_file_too_large_removes_partial_files(monkeypatch):
+    monkeypatch.setattr(entries, "MAX_FILE_BYTES", 10)
+    before = _media_files()
+    files = [("files", ("ok.jpg", b"small", "image/jpeg")), ("files", ("big.jpg", b"x" * 11, "image/jpeg"))]
+    res = _post(files=files)
+    assert res.status_code == 400
+    assert res.json() == {"error": "file_too_large"}
+    assert _media_files() == before
+    # 실패한 날짜는 다시 올릴 수 있다
     assert _post().status_code == 202
-    res = _post()
-    assert res.status_code == 409
-    assert res.json() == {"error": "already_exists"}
