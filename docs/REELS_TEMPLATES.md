@@ -2,7 +2,14 @@
 
 > 하루릴스의 릴스 제작 방식 **단일 출처**. API 계약은 `docs/planning.md`, 이 문서는 렌더링 규칙. (이슈: 아래 "구현 체크리스트" 참고)
 
-실제 인스타그램 릴스 5개를 분석해서 만든 영상 생성 규칙이다. (분석 대상은 팀원 @sijin2170 **본인 계정의 릴스** — 외부 자료 아님, 영상·음원 미사용) 사용자가 올린 일기·사진·영상을 이 규칙대로 렌더링해 실제 릴스와 비슷한 퀄리티를 내는 것이 목표다.
+실제 인스타그램 릴스 5개를 분석해서 만든 영상 생성 규칙이다. (컷 길이·텍스트 배치 등 **스타일만 분석**, 영상·음원은 사용하지 않음 — 출처는 아래 및 `CREDITS.md`) 사용자가 올린 일기·사진·영상을 이 규칙대로 렌더링해 실제 릴스와 비슷한 퀄리티를 내는 것이 목표다.
+
+**분석한 릴스 (출처)**
+- @ruka_zzang — https://www.instagram.com/reels/DfW_1J4h4aK/
+- @min9ooram — https://www.instagram.com/reels/DfWIvazqa2V/
+- @muk__jjungsz — https://www.instagram.com/reels/DfW4U5FSOOx/
+- @adiavital0 — https://www.instagram.com/reels/DfV6rJ0RuNx/
+- @jongnogu_official — https://www.instagram.com/reels/DfYl6Ilh-wT/
 
 ## 1. 공통 규칙 (모든 템플릿)
 
