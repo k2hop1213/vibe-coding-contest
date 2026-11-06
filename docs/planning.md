@@ -71,8 +71,10 @@ POST /api/entries        (multipart/form-data)
   date: "2026-11-06"   diary: "..."   tags: "festival" (여러 개면 같은 키 반복: tags=festival&tags=calm)
   files: 이미지/동영상 1~10개 (같은 키 반복)
   → 202 { "id": "e_123", "date": "2026-11-06", "status": "processing" }
-  | 400 { "error": "no_media" | "no_tag" | "invalid_date" | "too_many_media" }
-  | 409 { "error": "already_exists" }        ← 하루 1개
+  | 400 { "error": "no_media" | "no_tag" | "invalid_date" | "too_many_media"
+          | "invalid_media" (허용 형식 아님: jpg·jpeg·png·gif·webp·mp4·mov·webm만. SVG·HEIC 불가) | "file_too_large" (개당 50MB 초과) }
+  | 409 { "error": "already_exists" }        ← 하루 1개. 단 status가 failed인 날은 다시 POST하면 덮어씀(새 id)
+  | 400 { "error": "invalid_request" }       ← 필드 타입 오류 등 (모든 API 공통, 422 대신)
 
 GET  /api/entries?month=2026-11
   → 200 { "entries": [ { "id", "date", "status", "thumbnailUrl": "/media/.." | null } ] }   ← done일 때만 썸네일

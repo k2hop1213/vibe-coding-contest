@@ -1,16 +1,34 @@
 import os
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.mock import SAMPLE_MEDIA_DIR
-from app.mock import router as mock_router
+from app import db, entries, styles
+from app.config import media_dir
 
 load_dotenv()
 
-app = FastAPI(title="하루릴스 API")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    db.fail_stale_processing()
+    yield
+
+
+app = FastAPI(title="하루릴스 API", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def no_sniff(request: Request, call_next):
+    """업로드 파일을 브라우저가 다른 형식(HTML 등)으로 추측해 실행하지 않게"""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 # 개발: Vite(5173). 배포: ALLOWED_ORIGINS="https://xxx.vercel.app,..."
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
@@ -22,12 +40,23 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
+    """FastAPI 기본 422 {detail: [...]} 대신 계약의 에러 형식으로 통일"""
+    return JSONResponse(status_code=400, content={"error": "invalid_request"})
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True}
 
 
-# #6 고정 데이터 API (실제 저장 #7 · AI 생성 #8이 붙으면 교체)
-app.include_router(mock_router)
-# 샘플 릴스 이미지. #7에서 업로드 파일용 /media 마운트를 추가할 때 이 줄보다 아래에 둘 것
+app.include_router(styles.router)
+app.include_router(entries.router)
+
+# 샘플 이미지(시드 데이터 #13용). 더 구체적인 경로라 /media보다 먼저 마운트한다
+SAMPLE_MEDIA_DIR = Path(__file__).parent / "sample_media"
 app.mount("/media/sample", StaticFiles(directory=SAMPLE_MEDIA_DIR), name="sample_media")
+# 업로드 파일
+media_dir().mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=media_dir()), name="media")
