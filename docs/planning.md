@@ -23,12 +23,13 @@
   - **스타일 태그** 칩 가로 스크롤, 1개 이상 선택: 🎞️ 감성 브이로그 · ⚡ 에너지 넘치는 · 📚 시험기간 생존기 · 🎉 축제·MT · 🌙 잔잔한 슬라이드쇼 · 😂 밈·유머 · 📼 레트로 필름
   - **사진·동영상 추가** 버튼 (1개 이상 필수, 미리보기 썸네일)
   - "릴스 만들기" 버튼
-- [ ] 2. **AI 편집 플랜** — 일기 + 사진 + 태그(분위기 힌트)를 AI에 보내 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md) §3 스키마의 편집 플랜을 받음: 템플릿 4종(`emotional`·`montage`·`review`·`closeup`) 중 선택, 클립 순서, 자막, 고정 텍스트, 플래시 몽타주
-- [ ] 3. **mp4 합성 + 재생** — 브라우저가 편집 플랜대로 **720×1280 / 30fps mp4**를 합성(#28 WebCodecs) → 서버에 업로드. 규칙은 스펙 그대로: 하드 컷, 사진 1.00→1.05 확대, 템플릿별 텍스트, 공통 색 보정, 무료 BGM. 웹은 그 mp4를 재생·저장
+- [ ] 2. **AI 편집 플랜** (v2, #31) — 일기 + 사진 + 태그(분위기 힌트)를 AI에 보내 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md) §3 스키마의 편집 플랜을 받음: 템플릿 4종(`emotional`·`montage`·`review`·`closeup`) 중 선택, 클립 순서, 자막, 고정 텍스트, 플래시 몽타주
+- [ ] 3. **mp4 합성 + 재생** (v2, #32) — 브라우저가 편집 플랜대로 **720×1280 / 30fps mp4**를 합성(#28 WebCodecs) → 서버에 업로드. 규칙은 스펙 그대로: 하드 컷, 사진 1.00→1.05 확대, 템플릿별 텍스트, 공통 색 보정. 웹은 그 mp4를 재생·저장
 - [ ] 4. **달력 홈** — 월 달력, 릴스 있는 날은 썸네일로 표시, 날짜 탭 → 그날 릴스 재생 / 빈 날짜 탭 → 기록 작성
 - [ ] 5. 모바일·PC 둘 다 되는 반응형 웹
 
 ## 시간 남으면
+- BGM 오디오 트랙 (무료 음원 + CREDITS, WebCodecs AudioEncoder) — 스펙 §1
 - 같은 기록으로 다른 스타일 재생성
 - 한 달 모아보기 릴스 ("11월의 나")
 
@@ -43,7 +44,7 @@
 1. 달력 홈: 발표 전에 팀 사진으로 직접 만들어 둔 날짜들 → 하나 눌러 릴스(mp4) 재생 (첫인상)
 2. 오늘 날짜 탭 → 축제 사진 4장 + 짧은 일기 + 태그 🎉 축제·MT 선택 → 릴스 만들기
 3. 생성 중 화면 ("AI 편집 중 → 영상 합치는 중 n%") → 완성된 mp4 재생: AI가 고른 템플릿·자막, 하드 컷
-4. (시간 되면) 같은 기록을 🌙 잔잔한 슬라이드쇼로 다시 만들어 분위기 차이 보여주기
+4. (시간 되면) 미리 만들어 둔 다른 날짜 릴스를 열어 템플릿 차이(감성 vs 몽타주 등) 보여주기
 5. 달력으로 돌아와 오늘 칸이 채워진 것 확인 → "한 학기가 릴스로 남는다"로 마무리
 
 ## 기술 스택 (제안 — 팀 확인 필요)
@@ -81,6 +82,23 @@ GET  /api/entries?month=2026-11
 
 GET  /api/entries/{id}
   → 200 { "id", "date", "diary", "tags": [..], "status": "processing" | "done" | "failed",
+          "reel": null | {
+            "title": "축제 첫날",
+            "scenes": [ { "mediaUrl": "/media/..", "type": "image" | "video",
+                          "durationMs": 2500, "caption": "...", "transition": "fade" | "slide" | "zoom" } ]
+          } }
+  | 404 { "error": "not_found" }
+  ※ reel에 "videoUrl": "/media/.." | null — 장면을 하나로 합친 영상 (#27). null이면 아직 안 합침
+
+POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← #27
+  → 200 { "videoUrl": "/media/<uuid>.mp4" }
+  | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
+```
+### API 계약 v2 (예정 — 아직 코드에 없음. #31 서버 · #32 합성기 PR에서 위 계약을 이걸로 교체)
+> 구현 전까지는 **위의 현재 계약**을 따른다. v2로 바꾸는 PR이 이 섹션을 위로 올리고 지운다.
+```
+GET  /api/entries/{id}   (v2)
+  → 200 { "id", "date", "diary", "tags": [..], "status": "processing" | "done" | "failed",
           "reel": null | {                               ← done = AI 편집 플랜 완성 (영상은 브라우저가 합쳐서 업로드)
             "template": "emotional" | "montage" | "review" | "closeup",
             "clipDuration": 1.0,                         ← 초. 템플릿 기본값 (emotional 2.5 · montage/review 1.0 · closeup 0.8)
@@ -92,13 +110,11 @@ GET  /api/entries/{id}
             "videoUrl": "/media/..mp4" | null           ← 합친 영상 720×1280·30fps (#28). null이면 아직 안 합침
           } }
   | 404 { "error": "not_found" }
-
-POST /api/entries/{id}/video   (multipart: file = video/mp4 | video/webm)   ← #27
-  → 200 { "videoUrl": "/media/<uuid>.mp4" }
-  | 400 { "error": "no_media" | "invalid_media" | "file_too_large" } | 404 not_found | 409 { "error": "not_ready" }
 ```
-- 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지). 렌더링 규칙 상세는 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md)
-- `tags`는 그대로 받되 **분위기 힌트**로만 쓴다(템플릿 선택·자막 말투). 전환 효과에는 영향 없음 (하드 컷 고정)
+- v2 규칙: 사진이 6장 미만이면 `flashMontage`는 `null`(생략) · `captionEn`은 30자 이내 · 총 길이 10~30초를 넘으면 서버가 클립 수를 줄인다
+
+- 프론트는 생성 후 `GET /api/entries/{id}`를 2초 간격으로 확인 (status가 done/failed가 될 때까지). 렌더링 규칙 상세(v2)는 [`docs/REELS_TEMPLATES.md`](REELS_TEMPLATES.md)
+- (v2) `tags`는 그대로 받되 **분위기 힌트**로만 쓴다(템플릿 선택·자막 말투). 전환 효과에는 영향 없음 (하드 컷 고정)
 - 업로드 파일은 `GET /media/{파일명}`으로 서빙. `mediaUrl`·`thumbnailUrl`은 상대 경로 → 프론트는 `mediaUrl()`(`app/src/lib/api.ts`)로 `API_BASE`를 붙여 쓴다
 
 ## 타임라인
