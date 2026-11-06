@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getEntry, withMediaUrls, type EntryDetail, type EntryStatus } from '../lib/api'
+import { canEncode } from '../lib/encodeReel'
+import { canRecord } from '../lib/recordReel'
 import ReelPlayer from './ReelPlayer'
+import ReelVideo from './ReelVideo'
+import ReelVideoMaker from './ReelVideoMaker'
 
 export const POLL_MS = 2000 // planning.md: 생성 후 2초 간격으로 확인
 export const SLOW_MS = 20000 // 이 시간이 넘으면 "조금 더 걸려요" 안내
@@ -19,6 +23,10 @@ export default function EntryView({ id, onStatus, onRetry, pollMs = POLL_MS, slo
   const [detail, setDetail] = useState<EntryDetail | null>(null)
   const [error, setError] = useState(false)
   const [slow, setSlow] = useState(false)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [skipVideo, setSkipVideo] = useState(false)
+  // 매 렌더 새 객체를 만들면 영상 녹화가 다시 시작되므로 고정
+  const reel = useMemo(() => (detail?.reel ? withMediaUrls(detail.reel) : null), [detail?.reel])
 
   useEffect(() => {
     let stop = false
@@ -49,10 +57,18 @@ export default function EntryView({ id, onStatus, onRetry, pollMs = POLL_MS, slo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, pollMs, slowMs])
 
-  if (detail?.status === 'done' && detail.reel) {
+  if (detail?.status === 'done' && reel) {
+    // 1) 이미 하나로 합친 영상이 있으면 영상 재생  2) 없으면 브라우저에서 합치기(#27)  3) 녹화 불가·건너뛰기면 미리보기 플레이어
+    const video = videoUrl ?? reel.videoUrl
     return (
       <div className="mx-auto w-full max-w-[280px]">
-        <ReelPlayer reel={withMediaUrls(detail.reel)} />
+        {video ? (
+          <ReelVideo src={video} fileName={`하루릴스_${detail.date}`} />
+        ) : (canEncode() || canRecord()) && !skipVideo ? (
+          <ReelVideoMaker entryId={detail.id} reel={reel} onDone={setVideoUrl} onSkip={() => setSkipVideo(true)} />
+        ) : (
+          <ReelPlayer reel={reel} />
+        )}
       </div>
     )
   }

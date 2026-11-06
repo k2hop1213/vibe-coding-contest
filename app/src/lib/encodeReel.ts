@@ -1,0 +1,125 @@
+// 릴스를 프레임 단위로 그려서 바로 MP4로 인코딩한다 (#27).
+// MediaRecorder(실시간 녹화)는 브라우저가 잠깐만 버벅여도 그 구간이 영상에서 멈추거나 건너뛰어서,
+// 각 프레임을 정확한 시각(i / FPS)에 그리고 그 시각을 타임스탬프로 붙여 WebCodecs로 인코딩한다.
+// 실시간이 아니라서 보통 릴스 길이보다 빨리 끝나고, 결과는 항상 30fps로 고르다.
+// 출처: mp4-muxer (Vanilagy, MIT) https://github.com/Vanilagy/mp4-muxer — MP4 컨테이너 작성
+import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
+import { drawFrame, framePlan, totalDuration, type Drawable } from './reelFrame'
+import { loadMedia } from './recordReel'
+import type { Reel } from './types'
+
+export const FPS = 30
+const KEYFRAME_EVERY = FPS * 2
+// 인스타·카톡에서 잘 재생되는 H.264. 앞에서부터 지원되는 것을 쓴다 (High 4.0 → Main 4.0 → Baseline 3.1)
+const CODECS = ['avc1.640028', 'avc1.4d0028', 'avc1.42001f']
+
+export function canEncode(): boolean {
+  return typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined'
+}
+
+async function pickCodec(width: number, height: number): Promise<string | undefined> {
+  for (const codec of CODECS) {
+    try {
+      const { supported } = await VideoEncoder.isConfigSupported({ codec, width, height, bitrate: 6_000_000, framerate: FPS })
+      if (supported) return codec
+    } catch {
+      /* 다음 후보 */
+    }
+  }
+  return undefined
+}
+
+/** 브라우저 일을 잠깐 넘겨준다(인코더 출력 콜백·화면 갱신). 백그라운드 탭에서도 setTimeout보다 덜 느려지는 MessageChannel 사용 */
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => {
+    const ch = new MessageChannel()
+    ch.port1.onmessage = () => resolve()
+    ch.port2.postMessage(null)
+  })
+
+function seek(v: HTMLVideoElement, sec: number): Promise<void> {
+  const target = Math.min(Math.max(0, sec), Math.max(0, (v.duration || 0) - 0.05))
+  if (Math.abs(v.currentTime - target) < 0.001) return Promise.resolve()
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      v.removeEventListener('seeked', done)
+      resolve()
+    }
+    const timer = setTimeout(done, 1000) // 탐색이 안 끝나도 그 프레임은 그대로 그린다
+    v.addEventListener('seeked', done)
+    v.currentTime = target
+  })
+}
+
+/** 장면 i가 몇 ms에 시작하는지 */
+function sceneStarts(reel: Reel): number[] {
+  const starts: number[] = []
+  let t = 0
+  for (const s of reel.scenes) {
+    starts.push(t)
+    t += Math.max(500, s.durationMs || 0)
+  }
+  return starts
+}
+
+export async function encodeReel(
+  canvas: HTMLCanvasElement,
+  reel: Reel,
+  { onProgress, signal }: { onProgress?: (ratio: number) => void; signal?: AbortSignal } = {},
+): Promise<{ blob: Blob; mimeType: string }> {
+  const { width, height } = canvas
+  const codec = await pickCodec(width, height)
+  if (!codec) throw new Error('이 브라우저는 영상 인코딩(H.264)을 지원하지 않아요')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('캔버스를 쓸 수 없어요')
+
+  const media: Drawable[] = await loadMedia(reel)
+  await document.fonts?.load(`700 40px "Pretendard Variable"`).catch(() => undefined)
+  media.forEach((m) => m instanceof HTMLVideoElement && m.pause())
+
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: { codec: 'avc', width, height, frameRate: FPS },
+    fastStart: 'in-memory', // 앞부분에 색인을 둬서 받자마자 재생되게
+  })
+  let encodeError: unknown = null
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => (encodeError = e),
+  })
+  encoder.configure({ codec, width, height, bitrate: 6_000_000, framerate: FPS })
+
+  const total = totalDuration(reel)
+  const frames = Math.ceil((total / 1000) * FPS)
+  const starts = sceneStarts(reel)
+  try {
+    for (let i = 0; i < frames; i++) {
+      if (signal?.aborted) throw new DOMException('영상 만들기를 취소했어요', 'AbortError')
+      if (encodeError) throw encodeError
+      const ms = (i * 1000) / FPS
+      const { current, under } = framePlan(reel, ms)
+      // 동영상 장면은 그 장면 안의 위치로 맞춘다(전환 중 아래 깔린 장면은 끝 프레임)
+      for (const layer of [under, current]) {
+        const v = layer && media[layer.index]
+        if (v instanceof HTMLVideoElement) {
+          await seek(v, layer === current ? (ms - starts[layer.index]) / 1000 : v.duration)
+        }
+      }
+      drawFrame(ctx, reel, media, ms)
+      const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / FPS), duration: Math.round(1e6 / FPS) })
+      encoder.encode(frame, { keyFrame: i % KEYFRAME_EVERY === 0 })
+      frame.close()
+      onProgress?.((i + 1) / frames)
+      // 인코더가 밀리면 잠깐 기다린다(메모리 폭주 방지), 아니면 몇 프레임마다 화면 갱신 기회를 준다
+      while (encoder.encodeQueueSize > 8) await yieldToBrowser()
+      if (i % 3 === 0) await yieldToBrowser()
+    }
+    await encoder.flush()
+    if (encodeError) throw encodeError
+    muxer.finalize()
+  } finally {
+    if (encoder.state !== 'closed') encoder.close()
+  }
+  return { blob: new Blob([muxer.target.buffer], { type: 'video/mp4' }), mimeType: 'video/mp4' }
+}

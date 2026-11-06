@@ -16,6 +16,7 @@
 
 | 이름 | 용도 | 라이선스 | 링크 |
 |---|---|---|---|
+| mp4-muxer (Vanilagy) | 브라우저에서 인코딩한 영상 프레임을 MP4 파일로 묶기 (`app/src/lib/encodeReel.ts`) | MIT | https://github.com/Vanilagy/mp4-muxer |
 | Pretendard (가변 폰트, dynamic subset) | 웹 전체 기본 폰트 (`app/src/index.css`) | OFL-1.1 | https://github.com/orioncactus/pretendard |
 | create-vite (`react-ts` 템플릿) | `app/` 초기 골격 생성 | MIT | https://github.com/vitejs/vite/tree/main/packages/create-vite |
 | React | UI | MIT | https://react.dev |

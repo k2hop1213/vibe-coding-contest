@@ -128,7 +128,10 @@ def generate_reel(entry_id: str) -> None:
 
 
 def _public(entry: dict) -> dict:
-    return {k: entry[k] for k in ("id", "date", "diary", "tags", "status", "reel")}
+    out = {k: entry[k] for k in ("id", "date", "diary", "tags", "status", "reel")}
+    if out["reel"] is not None:
+        out["reel"] = {**out["reel"], "videoUrl": out["reel"].get("videoUrl")}  # 영상 합치기 전이면 null
+    return out
 
 
 def _summary(entry: dict) -> dict:
@@ -207,6 +210,61 @@ async def create_entry(
         return _error(409, "already_exists")
     if existing:
         _delete_media(existing["media"])
+        _delete_video(existing)
 
     background.add_task(generate_reel, entry_id)
     return {"id": entry_id, "date": d.isoformat(), "status": "processing"}
+
+
+# ── 하나로 합친 릴스 영상 (#27) ─────────────────────────────────────────
+# 브라우저가 완성된 릴스를 캔버스에 그리며 녹화한 파일을 올린다(서버 ffmpeg 합성은 무료 서버에서 너무 느림).
+_VIDEO_EXT = {"video/mp4": ".mp4", "video/webm": ".webm"}
+
+
+def _delete_video(entry: dict) -> None:
+    url = (entry.get("reel") or {}).get("videoUrl")
+    if url:
+        (media_dir() / Path(url).name).unlink(missing_ok=True)
+
+
+@router.post("/entries/{entry_id}/video", response_model=None)
+async def upload_video(
+    entry_id: str,
+    file: Annotated[UploadFile | None, File()] = None,
+) -> dict | JSONResponse:
+    entry = db.get_entry(entry_id)
+    if entry is None:
+        return _error(404, "not_found")
+    if entry["status"] != "done" or not entry["reel"]:
+        return _error(409, "not_ready")
+    if file is None or not file.filename:
+        return _error(400, "no_media")
+    # content_type의 코덱 부분(;codecs=...)은 떼고, 확장자는 서버가 정한다
+    ext = _VIDEO_EXT.get((file.content_type or "").split(";")[0].strip().lower())
+    if ext is None:
+        return _error(400, "invalid_media")
+
+    folder = media_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{uuid.uuid4().hex}{ext}"
+    size = 0
+    try:
+        with path.open("wb") as out:
+            while chunk := await file.read(_CHUNK):
+                size += len(chunk)
+                if size > MAX_FILE_BYTES:
+                    raise _UploadError("file_too_large")
+                out.write(chunk)
+    except BaseException as e:
+        path.unlink(missing_ok=True)
+        if isinstance(e, _UploadError):
+            return _error(400, e.code)
+        raise
+    if size == 0:
+        path.unlink(missing_ok=True)
+        return _error(400, "no_media")
+
+    _delete_video(entry)  # 다시 녹화한 경우 예전 파일 정리
+    video_url = f"/media/{path.name}"
+    db.finish_entry(entry_id, "done", {**entry["reel"], "videoUrl": video_url})
+    return {"videoUrl": video_url}
