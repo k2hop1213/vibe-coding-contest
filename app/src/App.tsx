@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import EntryForm from './components/EntryForm'
-import { getEntries, getHealth, type EntryDraft, type EntrySummary } from './lib/api'
+import EntryView from './components/EntryView'
+import {
+  createEntry,
+  errorMessage,
+  getEntries,
+  getHealth,
+  ApiError,
+  type EntryDraft,
+  type EntrySummary,
+} from './lib/api'
 import { addMonths, monthKey, toISODate } from './lib/calendar'
 import { mockEntries } from './lib/mockEntries'
 
@@ -17,7 +26,10 @@ function App() {
   // 월별 캐시: 다른 달로 넘겨도 선택한 날짜의 기록을 잃지 않도록 (month → date → entry)
   const [byMonth, setByMonth] = useState<Record<string, Record<string, EntrySummary>>>({})
   const [usingMock, setUsingMock] = useState(false)
-  const [draft, setDraft] = useState<EntryDraft | null>(null)
+  const [upload, setUpload] = useState<{ date: string; progress: number } | null>(null)
+  const [submitError, setSubmitError] = useState<{ date: string; message: string } | null>(null)
+  const [retrying, setRetrying] = useState<string | null>(null) // failed 날짜를 다시 만드는 중
+  const [reload, setReload] = useState(0) // 달력 다시 불러오기
 
   useEffect(() => {
     getHealth()
@@ -40,10 +52,30 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [view.year, view.month0])
+  }, [view.year, view.month0, reload])
 
   const move = (delta: number) => setView((v) => addMonths(v.year, v.month0, delta))
   const entry = byMonth[selected.slice(0, 7)]?.[selected]
+  const showForm = !entry || retrying === selected
+
+  const putEntry = (e: EntrySummary) =>
+    setByMonth((b) => ({ ...b, [e.date.slice(0, 7)]: { ...b[e.date.slice(0, 7)], [e.date]: e } }))
+
+  const submit = async (draft: EntryDraft) => {
+    setSubmitError(null)
+    setUpload({ date: draft.date, progress: 0 })
+    try {
+      const res = await createEntry(draft, (p) => setUpload({ date: draft.date, progress: p }))
+      setRetrying(null)
+      putEntry({ id: res.id, date: res.date, status: res.status, thumbnailUrl: null })
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : 'network'
+      setSubmitError({ date: draft.date, message: errorMessage(code) })
+      if (code === 'already_exists') setReload((n) => n + 1) // 다른 곳에서 먼저 만든 경우 → 달력 갱신
+    } finally {
+      setUpload(null)
+    }
+  }
   const [, m, d] = selected.split('-').map(Number)
   const weekday = WEEKDAY_KO[new Date(selected + 'T00:00').getDay()]
 
@@ -66,30 +98,47 @@ function App() {
             {m}월 {d}일 <span className="text-neutral-400">{weekday}요일</span>
           </h2>
 
-          {!entry && (
+          {showForm && (
             <div className="mt-5 flex flex-1 flex-col">
               {/* key: 날짜를 바꾸면 입력 내용 초기화 */}
-              <EntryForm key={selected} date={selected} onSubmit={setDraft} />
-              {draft?.date === selected && (
-                // TODO(#12): createEntry로 전송 → 생성 중 화면 → 완료 시 플레이어
-                <p className="mt-3 text-center text-xs text-neutral-400" data-testid="draft-ready">
-                  입력 완료: 파일 {draft.files.length}개 · 태그 {draft.tags.length}개 (서버 전송은 #12)
+              <EntryForm
+                key={selected}
+                date={selected}
+                onSubmit={submit}
+                submitting={upload?.date === selected}
+              />
+              {upload?.date === selected && (
+                <div className="mt-3" data-testid="upload-progress">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-neutral-200">
+                    <div
+                      className="h-full bg-linear-to-r from-rose-500 to-fuchsia-600 transition-[width]"
+                      style={{ width: `${Math.round(upload.progress * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-center text-xs text-neutral-500">
+                    업로드 중 {Math.round(upload.progress * 100)}%
+                  </p>
+                </div>
+              )}
+              {submitError?.date === selected && (
+                <p className="mt-3 text-center text-sm text-rose-600" role="alert">
+                  {submitError.message}
                 </p>
               )}
             </div>
           )}
-          {entry && (
-          <div className="mt-4 flex flex-1 items-center justify-center rounded-2xl border-2 border-dashed border-neutral-200 p-6 text-center text-neutral-500">
-            {entry.status === 'processing' && <p>릴스를 만드는 중이에요…</p>}
-            {entry.status === 'failed' && <p>릴스를 만들지 못했어요.</p>}
-            {entry.status === 'done' && (
-              <p>
-                이 날의 릴스
-                <br />
-                <span className="text-xs text-neutral-400">(플레이어 #11)</span>
-              </p>
-            )}
-          </div>
+          {entry && !showForm && (
+            <div className="mt-5 flex flex-1 flex-col">
+              <EntryView
+                key={entry.id}
+                id={entry.id}
+                onStatus={(status) => {
+                  putEntry({ ...entry, status })
+                  if (status === 'done') setReload((n) => n + 1) // 썸네일 받아오기
+                }}
+                onRetry={() => setRetrying(selected)}
+              />
+            </div>
           )}
         </main>
 

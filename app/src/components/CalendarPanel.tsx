@@ -75,7 +75,12 @@ export default function CalendarPanel({
 
         {cells.map((c) => {
           const entry = c.inMonth ? entries[c.date] : undefined
-          const thumb = entry?.status === 'done' ? mediaUrl(entry.thumbnailUrl) : null
+          const done = entry?.status === 'done'
+          const thumbUrl = done ? mediaUrl(entry.thumbnailUrl) : null
+          const isVideoThumb = !!thumbUrl && entry?.thumbnailType === 'video'
+          const thumb = isVideoThumb ? null : thumbUrl
+          const hasCover = !!thumbUrl
+          const noThumbDone = done && !thumbUrl // 동영상만 있는데 서버가 썸네일을 안 준 경우
           const isToday = c.date === today
           const isSelected = c.date === selected
 
@@ -88,18 +93,32 @@ export default function CalendarPanel({
               onClick={() => onSelect(c.date)}
               aria-label={`${month0 + 1}월 ${c.day}일${entry ? ` (${statusLabel[entry.status]})` : ''}`}
               aria-pressed={isSelected}
-              className={`relative mx-auto flex aspect-[3/4] w-full max-w-12 items-center justify-center rounded-xl text-sm font-medium transition
+              className={`relative mx-auto flex aspect-[3/4] w-full max-w-12 items-center justify-center overflow-hidden rounded-xl text-sm font-medium transition
                 ${isSelected ? 'ring-2 ring-white' : 'hover:bg-white/15'}
-                ${c.weekday === 6 && !thumb ? 'text-orange-200' : ''}`}
+                ${noThumbDone ? 'bg-white/20' : ''}
+                ${c.weekday === 6 && !hasCover ? 'text-orange-200' : ''}`}
               style={thumb ? { backgroundImage: `url(${JSON.stringify(thumb)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
             >
+              {isVideoThumb && (
+                // 동영상 1초 지점을 사진처럼 보여준다 (#20 A안)
+                <video
+                  src={`${thumbUrl}#t=1`}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-hidden
+                  data-testid="video-thumb"
+                  className="pointer-events-none absolute inset-0 size-full object-cover"
+                />
+              )}
               <span
-                className={`flex size-7 items-center justify-center rounded-full
+                className={`relative flex size-7 items-center justify-center rounded-full
                   ${isToday ? 'bg-orange-400 text-white shadow' : ''}
-                  ${thumb && !isToday ? 'bg-black/25' : ''}`}
+                  ${hasCover && !isToday ? 'bg-black/25' : ''}`}
               >
                 {c.day}
               </span>
+              {noThumbDone && <span className="absolute right-0.5 bottom-0.5 text-[10px]" aria-hidden>🎬</span>}
               {entry?.status === 'processing' && (
                 <span className="absolute bottom-1 size-1.5 animate-pulse rounded-full bg-white" />
               )}

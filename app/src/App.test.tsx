@@ -14,11 +14,20 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+const reel = {
+  title: '축제 첫날',
+  scenes: [{ mediaUrl: '/media/a.jpg', type: 'image', durationMs: 2000, caption: '시작!', transition: 'fade' }],
+}
+
 function mockServer() {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = String(input)
     if (url.includes('/api/health')) return json({ ok: true })
     if (url.includes('/api/styles')) return json({ styles: [{ id: 'festival', label: '축제·MT', emoji: '🎉' }] })
+    if (url.endsWith('/api/entries/e1'))
+      return json({ id: 'e1', date: '2026-11-03', diary: '', tags: ['festival'], status: 'done', reel })
+    if (url.endsWith('/api/entries/e2'))
+      return json({ id: 'e2', date: '2026-11-04', diary: '', tags: ['festival'], status: 'processing', reel: null })
     if (url.includes('month=2026-11'))
       return json({
         entries: [
@@ -53,10 +62,11 @@ test('이번 달 기록을 달력에 표시하고, 날짜를 누르면 왼쪽 �
   expect(fetchSpy).toHaveBeenCalledWith('/api/entries?month=2026-11')
 
   fireEvent.click(await screen.findByRole('button', { name: '11월 3일 (릴스 있음)' }))
-  expect(screen.getByText(/이 날의 릴스/)).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: '릴스 일시정지' })).toBeInTheDocument()
+  expect(screen.getByText('시작!')).toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: '11월 4일 (만드는 중)' }))
-  expect(screen.getByText(/만드는 중이에요/)).toBeInTheDocument()
+  expect(await screen.findByText('AI가 릴스를 편집하고 있어요')).toBeInTheDocument()
 })
 
 test('다음 달로 넘기면 그 달 기록을 다시 불러온다', async () => {
@@ -74,6 +84,6 @@ test('기록 있는 날을 선택한 채 다른 달로 넘겨도 왼쪽 패널�
   fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
   expect(await screen.findByText('12월')).toBeInTheDocument()
   expect(screen.getByTestId('selected-date')).toHaveTextContent('11월 3일')
-  expect(screen.getByText(/이 날의 릴스/)).toBeInTheDocument()
-  expect(screen.queryByText(/아직 기록이 없어요/)).not.toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: '릴스 일시정지' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '✨ 릴스 만들기' })).not.toBeInTheDocument()
 })
