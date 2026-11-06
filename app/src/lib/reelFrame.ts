@@ -10,13 +10,11 @@ export const VIDEO_H = 1280
 
 export const FLASH_MS = 150 // 플래시 몽타주 한 장
 export const MIN_CLIP_MS = 300
-export const PHOTO_ZOOM = 0.05 // 사진은 클립 동안 1.00 → 1.05
 export const SAFE_TOP = 0.1 // 세이프존: 위 10%, 아래 15%에는 텍스트를 넣지 않는다
 export const SAFE_BOTTOM = 0.85
 export const COLOR_FILTER = 'contrast(1.05) saturate(1.1)' // 모든 클립 공통 색 보정
 export const EN_COLOR = '#F5D547'
 
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const isVideoUrl = (url: string) => /\.(mp4|mov|webm)(\?|$)/i.test(url)
 
 /** 그릴 미디어 목록: clips 다음에 플래시 몽타주 사진들. drawFrame의 media[i]가 이 순서 */
@@ -63,8 +61,6 @@ export interface FramePlan {
   clip: number | null
   /** 이 구간 안에서 지난 시간(ms) — 동영상 위치 */
   local: number
-  /** 사진 확대 배율 (동영상은 1) */
-  zoom: number
 }
 
 /** 릴스 시작부터 ms 지난 시점에 그릴 것. 끝을 넘으면 마지막 프레임에 머문다 */
@@ -74,10 +70,8 @@ export function framePlan(reel: Reel, ms: number, segs: Segment[] = timeline(ree
   if (i < 0) i = segs.length - 1
   const s = segs[i]
   const local = Math.min(s.duration, Math.max(0, ms - s.start))
-  const isVideo = mediaList(reel)[s.media]?.type === 'video'
-  // 플래시 몽타주는 0.15초라 확대 없이 그대로
-  const zoom = isVideo || s.clip === null ? 1 : 1 + PHOTO_ZOOM * clamp01(local / s.duration)
-  return { segment: i, media: s.media, clip: s.clip, local, zoom }
+  // 사진·동영상 모두 확대 없이 그대로 (팀 결정 11/06)
+  return { segment: i, media: s.media, clip: s.clip, local }
 }
 
 export interface TextLine {
@@ -166,11 +160,11 @@ function mediaSize(m: Drawable) {
   return m instanceof HTMLVideoElement ? { w: m.videoWidth, h: m.videoHeight } : { w: m.naturalWidth, h: m.naturalHeight }
 }
 
-/** object-fit: cover + 가운데 기준 확대 */
-function drawCover(ctx: CanvasRenderingContext2D, m: Drawable, zoom: number, W: number, H: number) {
+/** object-fit: cover (가운데 기준, 확대 없음) */
+function drawCover(ctx: CanvasRenderingContext2D, m: Drawable, W: number, H: number) {
   const { w, h } = mediaSize(m)
   if (!w || !h) return
-  const s = Math.max(W / w, H / h) * zoom
+  const s = Math.max(W / w, H / h)
   const dw = w * s
   const dh = h * s
   ctx.drawImage(m, (W - dw) / 2, (H - dh) / 2, dw, dh)
@@ -217,7 +211,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, reel: Reel, media: (Dra
   if (m) {
     ctx.save()
     ctx.filter = COLOR_FILTER
-    drawCover(ctx, m, plan.zoom, W, H)
+    drawCover(ctx, m, W, H)
     ctx.restore()
   }
   textLayout(reel, plan.clip).forEach((t) => drawText(ctx, t, W, H))
