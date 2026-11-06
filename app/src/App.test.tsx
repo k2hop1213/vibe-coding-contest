@@ -18,6 +18,7 @@ function mockServer() {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = String(input)
     if (url.includes('/api/health')) return json({ ok: true })
+    if (url.includes('/api/styles')) return json({ styles: [{ id: 'festival', label: '축제·MT', emoji: '🎉' }] })
     if (url.includes('month=2026-11'))
       return json({
         entries: [
@@ -47,7 +48,8 @@ test('이번 달 기록을 달력에 표시하고, 날짜를 누르면 왼쪽 �
   render(<App />)
 
   expect(screen.getByTestId('selected-date')).toHaveTextContent('11월 6일 금요일')
-  expect(screen.getByText(/아직 기록이 없어요/)).toBeInTheDocument()
+  // 기록 없는 날 → 작성 폼
+  expect(screen.getByRole('button', { name: '✨ 릴스 만들기' })).toBeDisabled()
   expect(fetchSpy).toHaveBeenCalledWith('/api/entries?month=2026-11')
 
   fireEvent.click(await screen.findByRole('button', { name: '11월 3일 (릴스 있음)' }))
