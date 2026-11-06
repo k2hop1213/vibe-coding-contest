@@ -10,6 +10,7 @@
 |---|---|---|---|---|
 | 기록 작성 화면 레이아웃 (일기 입력 · 스타일 태그 칩 · 사진/동영상 추가 버튼) | vStory 앱 화면 (디자인 참고, 코드 미사용) — URL 추가 필요 | — | `app/src/components/EntryForm.tsx` | @k2hop1213 |
 | 달력 홈 디자인 (그라데이션 패널 · 큰 연도 · 오늘 날짜 원) — "Calendar 2022 (One Page Calendar)" by Agensip (디자이너 Laude Pirera Ardi), 디자인만 참고·에셋/코드 미사용 | 원본: https://agensip.gumroad.com/l/calendar2022 · 소개: https://freebiesbug.com/figma-freebies/one-page-calendar/ | 명시 없음 (무료 배포) | `app/src/components/CalendarPanel.tsx`, `app/src/App.tsx` | @sijin2170 |
+| 릴스 템플릿 4종의 편집 규칙(컷 길이·하드 컷·텍스트 위치·플래시 몽타주) — 인스타그램 릴스 5개 스타일 분석, 영상·음원·코드 미사용 | https://www.instagram.com/reels/DfW_1J4h4aK/ · https://www.instagram.com/reels/DfWIvazqa2V/ · https://www.instagram.com/reels/DfW4U5FSOOx/ · https://www.instagram.com/reels/DfV6rJ0RuNx/ · https://www.instagram.com/reels/DfYl6Ilh-wT/ | 각 게시물 저작권은 원작자 (스타일 참고만) | `docs/REELS_TEMPLATES.md` (→ `server/app/reel_plan.py`, `app/src/lib/reelFrame.ts`) | @sijin2170 |
 | 예: 카드 뒤집기 애니메이션 | https://example.com/... | MIT | `app/src/components/Card.tsx` | @k2hop1213 |
 
 ## 사용한 라이브러리 · 프레임워크
