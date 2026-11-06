@@ -1,6 +1,7 @@
 // 출처: 레이아웃 참고 — vStory 앱 작성 화면 (일기 입력 · 스타일 태그 칩 · 사진/동영상 추가), 디자인만 참고·코드 미사용
 import { useEffect, useRef, useState } from 'react'
 import { getStyles, type EntryDraft, type Style } from '../lib/api'
+import { ACCEPT, isAllowed } from '../lib/media'
 import { mockStyles } from '../lib/mockEntries'
 
 export const MAX_FILES = 10
@@ -18,6 +19,7 @@ export default function EntryForm({ date, onSubmit, submitting = false }: Props)
   const [diary, setDiary] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [media, setMedia] = useState<Media[]>([])
+  const [rejected, setRejected] = useState<string[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
   const mediaRef = useRef(media)
   useEffect(() => {
@@ -38,7 +40,9 @@ export default function EntryForm({ date, onSubmit, submitting = false }: Props)
 
   const addFiles = (list: FileList | null) => {
     if (!list) return
-    const picked = Array.from(list).filter((f) => /^(image|video)\//.test(f.type))
+    const all = Array.from(list)
+    const picked = all.filter(isAllowed)
+    setRejected(all.filter((f) => !isAllowed(f)).map((f) => f.name))
     setMedia((m) => [
       ...m,
       ...picked.slice(0, MAX_FILES - m.length).map((file) => ({ file, url: URL.createObjectURL?.(file) ?? '' })),
@@ -136,10 +140,16 @@ export default function EntryForm({ date, onSubmit, submitting = false }: Props)
             </div>
           ))}
         </div>
+        {rejected.length > 0 && (
+          <p className="text-xs text-rose-600" role="alert">
+            {rejected.join(', ')} — 지원하지 않는 형식이에요. jpg·png·gif·webp·mp4·mov·webm만 올릴 수 있어요
+            (아이폰 HEIC 사진은 설정 → 카메라 → 포맷 → &apos;높은 호환성&apos;으로 바꾸면 jpg로 저장돼요).
+          </p>
+        )}
         <input
           ref={fileInput}
           type="file"
-          accept="image/*,video/*"
+          accept={ACCEPT}
           multiple
           hidden
           data-testid="file-input"

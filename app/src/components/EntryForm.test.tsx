@@ -63,3 +63,14 @@ test('multipart 전송 시 tags는 같은 키를 반복한다', () => {
   expect(fd.getAll('tags')).toEqual(['festival', 'meme'])
   expect(fd.getAll('files')).toHaveLength(1)
 })
+
+test('HEIC·SVG 같은 미지원 형식은 빼고 안내한다', async () => {
+  render(<EntryForm date="2026-11-06" onSubmit={() => {}} />)
+  pick([
+    new File(['x'], 'IMG_0001.HEIC', { type: 'image/heic' }),
+    new File(['x'], 'logo.svg', { type: 'image/svg+xml' }),
+    img('ok.jpg'),
+  ])
+  expect(screen.getByText('1/10')).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent('IMG_0001.HEIC, logo.svg')
+})
