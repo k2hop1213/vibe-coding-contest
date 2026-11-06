@@ -7,8 +7,8 @@
 | 역할 | 이름 | GitHub |
 |---|---|---|
 | PM & Infra | [이름] | [@k2hop1213](https://github.com/k2hop1213) |
-| Frontend | [이름] | @TEAMMATE_B |
-| Backend · AI | [이름] | @TEAMMATE_C |
+| Frontend | [이름] | @sijin2170|
+| Backend · AI | [이름] | @songkh1201 |
 
 ## 시작하기
 
