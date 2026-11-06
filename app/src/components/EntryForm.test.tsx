@@ -25,10 +25,10 @@ test('사진·태그가 없으면 버튼이 꺼지고 안내 문구를 보여준
   render(<EntryForm date="2026-11-06" onSubmit={() => {}} />)
   await screen.findByRole('button', { name: '🎉 축제·MT' })
   expect(screen.getByRole('button', { name: '✨ 릴스 만들기' })).toBeDisabled()
-  expect(screen.getByText('사진·동영상과 스타일 태그를 1개 이상 골라 주세요')).toBeInTheDocument()
+  expect(screen.getByText('사진·동영상과 분위기 힌트를 1개 이상 골라 주세요')).toBeInTheDocument()
 
   pick([img('a.jpg')])
-  expect(screen.getByText('스타일 태그를 1개 이상 골라 주세요')).toBeInTheDocument()
+  expect(screen.getByText('분위기 힌트를 1개 이상 골라 주세요')).toBeInTheDocument()
 })
 
 test('일기·태그·사진을 채우면 제출된다', async () => {
@@ -73,4 +73,10 @@ test('HEIC·SVG 같은 미지원 형식은 빼고 안내한다', async () => {
   ])
   expect(screen.getByText('1/10')).toBeInTheDocument()
   expect(screen.getByRole('alert')).toHaveTextContent('IMG_0001.HEIC, logo.svg')
+})
+
+test('스타일 태그는 분위기 힌트로 안내한다', async () => {
+  render(<EntryForm date="2026-11-06" onSubmit={() => {}} />)
+  expect(await screen.findByRole('group', { name: '분위기 힌트' })).toBeInTheDocument()
+  expect(screen.getByText(/템플릿과 자막 말투를 고를 때 참고/)).toBeInTheDocument()
 })

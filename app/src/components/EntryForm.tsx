@@ -59,11 +59,11 @@ export default function EntryForm({ date, onSubmit, submitting = false }: Props)
   const noTag = tags.length === 0
   const hint =
     noMedia && noTag
-      ? '사진·동영상과 스타일 태그를 1개 이상 골라 주세요'
+      ? '사진·동영상과 분위기 힌트를 1개 이상 골라 주세요'
       : noMedia
         ? '사진·동영상을 1개 이상 추가해 주세요'
         : noTag
-          ? '스타일 태그를 1개 이상 골라 주세요'
+          ? '분위기 힌트를 1개 이상 골라 주세요'
           : null
   const canSubmit = !hint && !submitting
 
@@ -87,7 +87,8 @@ export default function EntryForm({ date, onSubmit, submitting = false }: Props)
       </label>
 
       <fieldset className="flex min-w-0 flex-col gap-2">
-        <legend className="mb-2 text-sm font-semibold text-neutral-700">릴스 스타일</legend>
+        <legend className="text-sm font-semibold text-neutral-700">분위기 힌트</legend>
+        <p className="-mt-1 mb-1 text-xs text-neutral-400">AI가 템플릿과 자막 말투를 고를 때 참고해요</p>
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {styles.map((s) => {
             const on = tags.includes(s.id)

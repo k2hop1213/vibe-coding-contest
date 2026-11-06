@@ -69,7 +69,7 @@ export class ApiError extends Error {
 
 export const ERROR_MESSAGES: Record<string, string> = {
   no_media: '사진이나 동영상을 1개 이상 올려 주세요.',
-  no_tag: '스타일 태그를 1개 이상 골라 주세요.',
+  no_tag: '분위기 힌트를 1개 이상 골라 주세요.',
   invalid_date: '날짜가 올바르지 않아요.',
   too_many_media: '사진·동영상은 10개까지 올릴 수 있어요.',
   invalid_media: 'jpg·png·gif·webp·mp4·mov·webm 파일만 올릴 수 있어요.',

@@ -4,6 +4,7 @@ import { VIDEO_H, VIDEO_W } from '../lib/reelFrame'
 import { canEncode, encodeReel } from '../lib/encodeReel'
 import { recordReel } from '../lib/recordReel'
 import type { Reel } from '../lib/types'
+import GenerationSteps from './GenerationSteps'
 
 type Phase = { kind: 'recording'; progress: number } | { kind: 'uploading' } | { kind: 'error'; message: string }
 
@@ -69,6 +70,9 @@ export default function ReelVideoMaker({ entryId, reel, onDone, onSkip }: Props)
       />
       {phase.kind !== 'error' ? (
         <div className="absolute inset-x-3 bottom-3 rounded-xl bg-black/60 px-3 py-2 text-white" role="status">
+          <div className="mb-1.5">
+            <GenerationSteps current="video" dark />
+          </div>
           <p className="text-xs font-semibold">
             {phase.kind === 'uploading' ? '영상 저장하는 중…' : `하나의 영상으로 합치는 중 ${percent}%`}
           </p>
