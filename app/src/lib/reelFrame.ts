@@ -31,8 +31,12 @@ export interface Segment {
   duration: number
   /** mediaList(reel) 안의 위치 */
   media: number
-  /** 자막을 가져올 클립. 플래시 몽타주 구간은 null */
+  /** 이 구간의 첫 클립(자막용). 플래시 몽타주 구간은 null */
   clip: number | null
+  /** 이 구간에 합쳐진 클립 수 — 같은 미디어가 연속되면 하나의 긴 컷으로 합친다 (#36) */
+  clipCount: number
+  /** 클립 한 개 길이(ms) — 합쳐진 구간 안에서 자막이 바뀌는 간격 */
+  clipMs: number
 }
 
 export function timeline(reel: Reel): Segment[] {
@@ -42,15 +46,31 @@ export function timeline(reel: Reel): Segment[] {
   const segs: Segment[] = []
   let t = 0
   const push = (duration: number, media: number, clip: number | null) => {
-    segs.push({ start: t, duration, media, clip })
+    segs.push({ start: t, duration, media, clip, clipCount: clip === null ? 0 : 1, clipMs: duration })
     t += duration
   }
-  reel.clips.forEach((_, i) => {
+  reel.clips.forEach((c, i) => {
     if (i === flashAt) flash.forEach((_, j) => push(FLASH_MS, reel.clips.length + j, null))
+    // 서버는 미디어가 적은 날 같은 클립을 연속으로 늘린다(0000011111, #36).
+    // 컷마다 동영상이 처음으로 되감기지 않도록 바로 앞 구간과 같은 미디어면 하나의 긴 컷으로 이어 붙인다.
+    // (자막은 원래 클립 경계마다 바뀌므로 clipMs 간격으로 계산 — framePlan 참고)
+    const prev = segs[segs.length - 1]
+    if (prev && prev.clip !== null && i !== flashAt && reel.clips[prev.clip].mediaUrl === c.mediaUrl) {
+      prev.duration += clipMs
+      prev.clipCount += 1
+      t += clipMs
+      return
+    }
     push(clipMs, i, i)
   })
   if (flashAt === reel.clips.length) flash.forEach((_, j) => push(FLASH_MS, reel.clips.length + j, null))
   return segs
+}
+
+/** 클립 i가 언제 시작해서 얼마나 보이는지 (합쳐진 구간 안이어도 클립 단위로) */
+export function clipSpan(segs: Segment[], i: number): { start: number; duration: number } | null {
+  const s = segs.find((x) => x.clip !== null && i >= x.clip && i < x.clip + x.clipCount)
+  return s && s.clip !== null ? { start: s.start + (i - s.clip) * s.clipMs, duration: s.clipMs } : null
 }
 
 export const totalDuration = (reel: Reel) => timeline(reel).reduce((sum, s) => sum + s.duration, 0)
@@ -71,7 +91,19 @@ export function framePlan(reel: Reel, ms: number, segs: Segment[] = timeline(ree
   const s = segs[i]
   const local = Math.min(s.duration, Math.max(0, ms - s.start))
   // 사진·동영상 모두 확대 없이 그대로 (팀 결정 11/06)
-  return { segment: i, media: s.media, clip: s.clip, local }
+  // 같은 미디어가 연속돼 합쳐진 긴 컷(#40)에서는 local이 이어지므로 동영상이 되감기지 않고 계속 재생된다.
+  // 자막은 원래 클립 경계마다 바뀐다
+  const clip = s.clip === null ? null : s.clip + Math.min(s.clipCount - 1, Math.floor(local / s.clipMs))
+  return { segment: i, media: s.media, clip, local }
+}
+
+/**
+ * 구간 안 시간(ms) → 동영상에서 보여 줄 위치(초). 같은 영상이 합쳐진 긴 구간(#40)이 영상보다 길면
+ * 마지막 프레임에 멈추지 않고 처음부터 반복 재생한다. 길이를 아직 모르면 그대로.
+ */
+export function videoTime(localMs: number, durationSec: number): number {
+  const t = Math.max(0, localMs / 1000)
+  return durationSec > 0 && Number.isFinite(durationSec) ? t % durationSec : t
 }
 
 export interface TextLine {

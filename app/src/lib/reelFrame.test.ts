@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { toPlan } from './api'
 import { pickMimeType } from './recordReel'
 import {
+  clipSpan,
+  videoTime,
   EN_COLOR,
   FLASH_MS,
   SAFE_BOTTOM,
@@ -48,6 +50,56 @@ describe('timeline / framePlan', () => {
     expect(totalDuration(r)).toBe(2500 * 3 + FLASH_MS * 2)
     expect(mediaList(r).map((m) => m.type)).toEqual(['image', 'image', 'video', 'image', 'video'])
     expect(framePlan(r, 2500 + 10)).toMatchObject({ clip: null })
+  })
+
+  test('같은 미디어가 연속되면(서버가 0000011111로 늘림, #36) 하나의 긴 컷: 자막은 클립마다, 시간은 이어서', () => {
+    const cap = (url: string, caption: string): Clip => ({ ...clip(url), caption })
+    const r: Reel = {
+      template: 'review',
+      clipDuration: 1,
+      clips: [cap('a', '하나'), cap('a', '둘'), cap('a', '셋'), cap('b', '넷'), cap('b', '다섯')],
+    }
+    const segs = timeline(r)
+    expect(segs).toHaveLength(2)
+    expect(segs[0]).toMatchObject({ start: 0, duration: 3000, clip: 0, clipCount: 3, clipMs: 1000 })
+    expect(segs[1]).toMatchObject({ start: 3000, duration: 2000, clip: 3, clipCount: 2 })
+    expect(totalDuration(r)).toBe(5000)
+    // 자막은 원래 클립 경계마다 바뀐다
+    expect([0, 1000, 2000, 3000, 4000].map((t) => framePlan(r, t)!.clip)).toEqual([0, 1, 2, 3, 4])
+    // 진행 바용: 합쳐진 구간 안의 클립도 자기 시간대를 안다
+    expect(clipSpan(segs, 1)).toEqual({ start: 1000, duration: 1000 })
+    expect(clipSpan(segs, 4)).toEqual({ start: 4000, duration: 1000 })
+  })
+
+  test('동영상 하나를 늘린 날: 컷마다 처음으로 되감기지 않고 이어서 재생된다', () => {
+    const v: Clip = { mediaUrl: '/v.mp4', type: 'video' }
+    const r: Reel = { template: 'closeup', clipDuration: 0.8, fixedText: { title: 'a\nb\nc' }, clips: Array(13).fill(v) }
+    expect(timeline(r)).toHaveLength(1)
+    // 동영상 위치(local)가 컷 경계(0.8초)에서 0으로 돌아가지 않는다
+    expect([700, 900, 1700, 5000].map((t) => Math.round(framePlan(r, t)!.local))).toEqual([700, 900, 1700, 5000])
+  })
+
+  test('합쳐진 구간이 영상보다 길면 처음부터 반복 재생한다 (마지막 프레임에 멈추지 않음)', () => {
+    expect(videoTime(2500, 3)).toBeCloseTo(2.5)
+    expect(videoTime(3500, 3)).toBeCloseTo(0.5)
+    expect(videoTime(7200, 3)).toBeCloseTo(1.2)
+    expect(videoTime(1200, NaN)).toBeCloseTo(1.2) // 길이를 아직 모르면 그대로
+    expect(videoTime(1200, 0)).toBeCloseTo(1.2)
+  })
+
+  test('플래시 몽타주 경계에서는 같은 사진이어도 합치지 않는다', () => {
+    const r: Reel = {
+      template: 'emotional',
+      clipDuration: 2.5,
+      clips: [clip('a'), clip('a'), clip('b')],
+      flashMontage: { startIndex: 1, mediaUrls: ['/f1.jpg'] },
+    }
+    expect(timeline(r).map((s) => s.clip)).toEqual([0, null, 1, 2])
+  })
+
+  test('떨어져 있는 같은 사진(0 1 0)은 합치지 않는다', () => {
+    const r: Reel = { ...base, clips: [clip('a'), clip('b'), clip('a')] }
+    expect(timeline(r)).toHaveLength(3)
   })
 
   test('플래시 몽타주는 emotional이 아니면 무시', () => {
